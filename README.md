@@ -175,7 +175,7 @@ KAN-KubeAgent/
 
 ## 👥 Authors
 
-- **Avanish Kasar** — Research Lead
+- **Avanish Kasar** - Research Lead
 
 ---
 
