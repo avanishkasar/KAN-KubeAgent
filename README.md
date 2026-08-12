@@ -1,4 +1,4 @@
-# KAN-KubeAgent 🧠☸️🤖
+# KAN KubeAgent 🧠☸️🤖
 
 > **Trustworthy Autonomous Remediation in Kubernetes using Kolmogorov-Arnold Verification Networks**
 
