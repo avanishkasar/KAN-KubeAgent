@@ -1,5 +1,19 @@
 # Weekly Research Log
 
+## 🏆 Certifications Completed
+
+| Cert | Provider | Completed | Relevance to Project |
+|------|----------|-----------|---------------------|
+| Introduction to Kubernetes (LFS158) | Linux Foundation | Aug 2026 | Core infrastructure — K8s concepts, kubectl, pods, deployments, RBAC |
+| Introduction to AI/ML Toolkits with Kubeflow (LFS147) | Linux Foundation | Aug 2026 | Kubeflow runs ON K8s — ML pipelines, training jobs, model serving inside clusters |
+
+### Why These Certs Matter for KAN-KubeAgent
+
+- **LFS158 (K8s):** You now have certified knowledge of everything the agent observes and manipulates — pods, namespaces, RBAC, audit logs, deployments. The K8s basics in `LEARNING_GUIDE.md` Level 1 can be skipped — you're already past that.
+- **LFS147 (Kubeflow):** Kubeflow is a real-world example of AI workloads running inside Kubernetes. This gives you direct insight into the kinds of ML-specific RBAC patterns, resource quotas, and security configurations that our agent would encounter in a production AI cluster. This is bonus context that most Kubernetes security papers don't have.
+
+---
+
 ## Template (Copy for each week)
 ```
 ## Week [N] — [Date Range]
@@ -11,25 +25,36 @@
 
 ---
 
-## Week 1 — August 2026
+## Week 1 — 12–14 August 2026
 
-### Goal: Read KAN original paper + KubeIntellect paper in depth
+### Goal: Project setup + foundation certifications
 
-**Papers targeted:**
-- [ ] arXiv:2404.19756 (KAN original)
+**Completed ✅:**
+- [x] Linux Foundation — Introduction to Kubernetes (LFS158)
+- [x] Linux Foundation — Introduction to AI/ML Toolkits with Kubeflow (LFS147)
+- [x] Repository created: KAN-KubeAgent (github.com/avanishkasar/KAN-KubeAgent)
+- [x] Core architecture diagram drafted
+- [x] Novelty claims documented (4 formal claims)
+- [x] Methodology draft written (KAN trust layer design + K-RAD dataset spec)
+- [x] Prioritised reading list (15 papers across 3 tiers)
+- [x] Full learning guide written (LEARNING_GUIDE.md)
+
+**Papers targeted for next week:**
+- [ ] arXiv:2404.19756 (KAN original — Liu et al.)
 - [ ] arXiv:2509.02449 (KubeIntellect)
 
-### Notes:
-- Research project initiated
-- Repository created: KAN-KubeAgent
-- Core architecture diagram drafted
-- Novelty claims documented
+### Kubeflow Connection to Project
+Since you now know Kubeflow (LFS147), note that:
+- Kubeflow Pipelines use K8s CRDs (Custom Resource Definitions) — a perfect use case for our agent's anomaly detection
+- Kubeflow uses ServiceAccounts with specific RBAC — our K-RAD dataset should include Kubeflow-style RBAC patterns
+- A future extension of KAN-KubeAgent could focus specifically on **securing AI/ML workloads in Kubeflow clusters** — a very niche and publishable angle
 
-### Next week plan:
-- Finish both papers above
-- Set up minikube environment
-- Install pykan library and run hello-world example
-- Install kubernetes Python client
+### Next Week Plan (Week 2)
+- Read KAN original paper (arXiv:2404.19756) — focus on Section 2 (architecture) and Section 3 (symbolic regression)
+- Install pykan and run the hello-world in this file
+- Read KubeIntellect paper — focus on the HITL gate weakness (our research gap)
+- Set up minikube locally
+- Write notes in this log after each paper
 
 ---
 

@@ -751,11 +751,17 @@ The KAN's safety judgement:
 Use this to track what you've learned:
 
 ## Foundations
+
+> 🏆 **Certifications already completed — items marked [CERT] below are already done.**
+> LFS158 (Intro to Kubernetes) + LFS147 (AI/ML Toolkits with Kubeflow) — Linux Foundation, August 2026
+
 - [ ] Watched 3Blue1Brown neural network series (4 videos)
 - [ ] Understand what weights, activations, and backprop are
-- [ ] Ran `minikube start` and deployed a test pod
-- [ ] Read about RBAC — understand Roles, ClusterRoles, RoleBindings
-- [ ] Read about K8s Audit Logs — know what fields they contain
+- [CERT] Ran `minikube start` and deployed a test pod ✅
+- [CERT] Read about RBAC — understand Roles, ClusterRoles, RoleBindings ✅
+- [CERT] Read about K8s Audit Logs — know what fields they contain ✅
+- [CERT] Understand pods, namespaces, deployments, services ✅
+- [CERT] Know what Kubeflow Pipelines are and how they run on K8s ✅
 - [ ] Understand what an AI agent loop is (observe → think → act)
 
 ## KAN
