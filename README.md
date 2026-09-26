@@ -1,6 +1,6 @@
 # KAN KubeAgent 🧠☸️🤖
 
-> **Trustworthy Autonomous Remediation in Kubernetes using Kolmogorov-Arnold Verification Networks**
+> **Trustworthy Autonomous Remediation in Kubernetes using Kolmogorov Arnold Verification Networks**
 
 [![Research Status](https://img.shields.io/badge/Status-Active%20Research-brightgreen)](.)
 [![Topics](https://img.shields.io/badge/Topics-KAN%20%7C%20Kubernetes%20%7C%20Agentic%20AI-blue)](.)
