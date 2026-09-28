@@ -1,0 +1,9 @@
+pykan>=0.2.8
+torch
+numpy
+matplotlib
+tqdm
+sympy
+pandas
+scikit-learn
+pytest
