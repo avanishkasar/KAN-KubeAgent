@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 
 
@@ -129,6 +130,14 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log_event(f"Training device: {device}")
+    if device.type == "cpu" and shutil.which("nvidia-smi") is not None:
+        log_event(
+            "NOTE: nvidia-smi found a GPU on this machine, but this PyTorch build has no "
+            "CUDA support (torch.cuda.is_available() is False) - training will run on CPU. "
+            "This is almost always a pip-installed CPU-only wheel, not missing hardware. "
+            "Fix: pip install torch --index-url https://download.pytorch.org/whl/cu121 "
+            "(see training/requirements.txt)."
+        )
 
     dataset = _load_dataset(args.subset_size)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
