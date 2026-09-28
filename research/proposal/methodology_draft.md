@@ -1,7 +1,7 @@
 # Methodology Draft — KAN-KubeAgent
 
-**Version:** 0.1 (Working Draft)  
-**Last Updated:** August 2026
+**Version:** 0.2 (Working Draft — Fine-Tuning Job Optimizer direction)
+**Last Updated:** September 2026
 
 ---
 
@@ -10,8 +10,8 @@
 KAN-KubeAgent consists of four integrated components:
 
 ```
-[1] Observation Layer    →  [2] LLM Agent Core  →  [3] KAN Trust Layer  →  [4] Executor
-(K8s API + Audit Logs)     (LangGraph FSM)         (Verification Gate)      (Apply / Reject)
+[1] Observation Layer     →  [2] LLM Agent Core   →  [3] KAN Gating Layer   →  [4] Executor
+(Kubeflow TrainJob state)    (LangGraph FSM)          (Continue/Adjust/Stop)    (Patch TrainJob CR)
 ```
 
 ---
@@ -19,25 +19,25 @@ KAN-KubeAgent consists of four integrated components:
 ## 2. Component 1: Observation & Feature Extraction
 
 ### 2.1 Data Sources
-- **Kubernetes Audit Log:** Every API request to kube-apiserver logged with verb, resource, user, namespace, response code
-- **Prometheus Metrics:** CPU/memory per pod, namespace-level quotas, error rates
-- **RBAC State Snapshot:** Current role-binding graph at time of proposed action
-- **Cluster Event Stream:** Pod restarts, OOMKills, failed deployments
 
-### 2.2 Feature Engineering for KAN Trust Layer
+- **Kubeflow `TrainJob` status** — current epoch, phase, conditions (via the Trainer Python SDK / K8s API)
+- **Training logs / metrics** — loss, gradient norm, learning rate, emitted per step or epoch
+- **Cluster resource state** — GPU/CPU utilization of the training pod, elapsed wall-clock time
+- **Budget config** — total GPU-hour budget allotted to the job, set at job submission
 
-For each proposed remediation action, extract:
+### 2.2 Feature Engineering for the KAN Gate
+
+For each decision point (e.g. every N epochs), extract:
 
 | Feature | Source | Description |
 |---------|--------|-------------|
-| `namespace_risk_score` | RBAC + criticality label | 0-1: is this namespace prod/staging/dev? |
-| `blast_radius` | Resource graph | How many downstream services affected? |
-| `change_frequency` | Audit log history | How often has this resource been changed? |
-| `actor_privilege_level` | RBAC | What permissions does the service account have? |
-| `resource_criticality` | Manually labeled | 0-1: StatefulSet > Deployment > ConfigMap |
-| `action_verb_risk` | CIS Benchmark | DELETE > PATCH > CREATE > GET |
-| `historical_failure_rate` | Audit log | Past error rate for this action type |
-| `time_since_last_deploy` | Deployment history | Recent changes increase risk |
+| `loss_plateau_score` | Loss history (last K epochs) | 0-1: how flat has the loss curve been recently |
+| `gradient_trend` | Gradient norm history | Direction/magnitude of gradient norm change |
+| `lr_decay_benefit` | LR schedule + loss history | Estimated improvement from reducing LR now |
+| `gpu_hours_remaining_vs_budget` | Budget config + elapsed time | 0-1: how much budget is left |
+| `epochs_since_improvement` | Loss history | Epochs since the best-seen validation loss |
+
+Real data comes directly from the running `TrainJob`. A **synthetic loss-curve generator** (exponential decay + noise + injectable plateaus) is kept behind a `--synthetic` flag / dashboard toggle for fast KAN-gate testing and edge-case reproduction — it is a debugging aid, not the primary data path.
 
 ---
 
@@ -48,41 +48,39 @@ For each proposed remediation action, extract:
 ```python
 # Pseudocode for supervisor
 class SupervisorAgent:
-    def run(self, user_query: str, cluster_state: ClusterState):
-        # 1. Parse intent
-        intent = self.llm.parse(user_query)
-        
-        # 2. Plan action sequence
-        plan = self.llm.plan(intent, cluster_state)
-        
-        # 3. Execute plan via domain agents
-        for step in plan.steps:
-            agent = self.route(step)
-            result = agent.execute(step)
-            
-            # 4. If action is mutating → go through KAN gate
-            if step.is_mutating:
-                trust = self.kan_gate.score(step, result)
-                if trust.score < 40:
-                    return self.reject(step, trust.formula)
-                elif trust.score < 80:
-                    return self.request_human_approval(step, trust.formula)
-                else:
-                    self.execute(step)
+    def run(self, trainjob_state: TrainJobState):
+        # 1. Gather observations from domain agents
+        metrics = self.metrics_watcher.observe(trainjob_state)
+        curve_analysis = self.loss_analyst.analyze(metrics)
+        cost = self.cost_estimator.estimate(trainjob_state)
+
+        # 2. Propose a control action
+        proposed_action = self.llm.plan(curve_analysis, cost)
+
+        # 3. Every proposed action must pass the KAN gate
+        gate_result = self.kan_gate.decide(curve_analysis, cost)
+
+        if gate_result.decision != proposed_action.kind:
+            # KAN gate overrides the agent's proposal — its verdict is final
+            proposed_action = gate_result.to_action()
+
+        return self.executor.apply(proposed_action, gate_result.formula)
 ```
 
-### 3.2 Domain Agents (Subset for Security Focus)
+### 3.2 Domain Agents (3-4 + Supervisor)
 
-| Agent | Tools | K8s APIs Used |
-|-------|-------|--------------|
-| **RBAC Agent** | list_roles, list_bindings, check_permissions | `/apis/rbac.authorization.k8s.io/` |
-| **Audit Log Agent** | query_audit_logs, detect_anomalies | `/logs/kube-apiserver-audit.log` |
-| **Network Agent** | list_network_policies, check_connectivity | `/apis/networking.k8s.io/` |
-| **Pod Security Agent** | check_psp, check_privileged | `/api/v1/pods` |
+| Agent | Tools | Signal Produced |
+|-------|-------|------------------|
+| **Metrics Watcher** | `get_trainjob_status`, `stream_logs` | Raw loss/gradient/LR time series |
+| **Loss-Curve Analyst** | `compute_plateau_score`, `compute_gradient_trend` | Plateau score, gradient trend |
+| **Cost Estimator** | `get_elapsed_gpu_hours`, `get_budget` | GPU-hours remaining vs. budget |
+| **Supervisor** | routes to KAN gate, calls `TrainJob` patch/delete | Final action + formula |
+
+*(A fourth agent — e.g. a **Hyperparameter Advisor** suggesting candidate LR values when the gate signals "adjust" — can be added once the 3-agent core loop is validated end-to-end.)*
 
 ---
 
-## 4. Component 3: KAN Trust Layer (Core Contribution)
+## 4. Component 3: KAN Gating Layer (Core Contribution)
 
 ### 4.1 Architecture
 
@@ -90,40 +88,33 @@ class SupervisorAgent:
 import torch
 from kan import KAN  # pykan library
 
-class KANTrustLayer:
+class KANGate:
     def __init__(self):
         self.model = KAN(
-            width=[8, 5, 3, 1],  # 8 features → 5 → 3 → 1 trust score
-            grid=10,              # spline grid resolution
-            k=3,                  # cubic splines
+            width=[5, 4, 3, 1],  # 5 features → 4 → 3 → 1 decision score
+            grid=10,
+            k=3,
             seed=42
         )
-    
-    def score(self, action_features: dict) -> TrustResult:
-        x = self.encode_features(action_features)
-        
-        # Forward pass → trust score [0, 100]
-        raw_score = self.model(x)
-        trust_score = torch.sigmoid(raw_score) * 100
-        
-        # Extract symbolic formula
+
+    def decide(self, features: dict) -> GateResult:
+        x = self.encode_features(features)
+
+        raw_output = self.model(x)
+        stop_score = torch.sigmoid(raw_output) * 100
+
         formula = self.model.symbolic_formula()
-        
-        # Compute Lipschitz bound (robustness certificate)
-        lipschitz = self.compute_lipschitz()
-        
-        return TrustResult(
-            score=trust_score.item(),
-            formula=formula,
-            certificate=lipschitz
-        )
-    
+
+        decision = self.route(stop_score)  # continue / adjust_lr / early_stop
+
+        return GateResult(decision=decision, score=stop_score.item(), formula=formula)
+
     def extract_formula(self) -> str:
         """
-        After training, KAN can identify symbolic forms.
+        After training, KAN identifies symbolic forms for each edge.
         Example output:
-        'trust = 0.82·relu(namespace_risk) + 0.61·sin(change_freq) 
-                - 0.43·blast_radius^2 + 0.11·actor_privilege'
+        'stop_score = 0.91·plateau(loss_slope) + 0.12·lr_decay_benefit
+                     - 0.40·remaining_gpu_hours'
         """
         self.model.auto_symbolic()
         return self.model.symbolic_formula()[0][0]
@@ -131,17 +122,12 @@ class KANTrustLayer:
 
 ### 4.2 Training Procedure
 
-**Dataset:** K-RAD (K8s Risk Action Dataset)
-- 10,000 K8s API audit events
-- Labels: [0=safe, 1=low_risk, 2=medium_risk, 3=high_risk, 4=critical]
-- Converted to continuous trust score: safe=95, low=75, medium=50, high=20, critical=5
+**Dataset:** labeled decision points from real training runs (see Section 6) — each labeled with the action a practitioner (or a strong scheduler baseline) would take: continue / adjust LR / early-stop.
 
-**Training:**
 ```python
-# KAN training (pykan API)
 dataset = {
-    'train_input': X_train,  # [N, 8] feature matrix
-    'train_label': y_train,  # [N, 1] trust scores
+    'train_input': X_train,  # [N, 5] feature matrix
+    'train_label': y_train,  # [N, 1] decision score
     'test_input': X_test,
     'test_label': y_test
 }
@@ -150,28 +136,22 @@ model.train(
     dataset,
     opt='Adam',
     steps=500,
-    lamb=0.001,      # L1 regularisation for sparsity
-    lamb_entropy=2.0  # entropy regularisation for interpretability
+    lamb=0.001,       # L1 regularisation for sparsity
+    lamb_entropy=2.0   # entropy regularisation for interpretability
 )
 
-# Grid refinement (coarse → fine)
-model.refine(grid=20)  # increase resolution after initial training
+model.refine(grid=20)  # grid refinement after initial training
 ```
 
 ### 4.3 Symbolic Formula Extraction
 
-After training:
 ```python
-# Try to identify known symbolic functions for each edge
 model.auto_symbolic(lib=['x', 'x^2', 'x^3', 'sin', 'exp', 'log', 'sqrt'])
-
-# Prune low-importance edges
 model.prune()
 
-# Get human-readable formula
 formula = model.symbolic_formula()
-# Example: trust = 0.8*x_0 + 0.6*sin(x_2) - 0.4*x_1^2 + 0.1*x_3
-# Where x_0=namespace_risk, x_1=blast_radius, x_2=change_freq, x_3=actor_privilege
+# Example: stop_score = 0.9*x_0 - 0.4*x_3 + 0.12*x_2
+# Where x_0=loss_plateau_score, x_2=lr_decay_benefit, x_3=gpu_hours_remaining
 ```
 
 ---
@@ -179,74 +159,47 @@ formula = model.symbolic_formula()
 ## 5. Component 4: Executor & Audit Trail
 
 ```python
-class TrustGatedExecutor:
-    
-    AUTO_APPLY_THRESHOLD = 80
-    HUMAN_REVIEW_THRESHOLD = 40
-    
-    def execute(self, action, trust_result):
-        # Log everything to audit DB
-        self.audit_log.record(action, trust_result)
-        
-        if trust_result.score >= self.AUTO_APPLY_THRESHOLD:
-            # Auto-apply with formula logged
-            result = self.k8s_client.apply(action)
-            self.audit_log.record_outcome(action, "AUTO_APPLIED", trust_result.formula)
-            
-        elif trust_result.score >= self.HUMAN_REVIEW_THRESHOLD:
-            # Show human the formula and ask for approval
-            approval = self.notify_human(
-                action=action,
-                score=trust_result.score,
-                formula=trust_result.formula,
-                certificate=trust_result.certificate
-            )
-            if approval:
-                self.k8s_client.apply(action)
-                
-        else:
-            # Auto-reject with explanation
-            self.audit_log.record_outcome(action, "AUTO_REJECTED", trust_result.formula)
+class KANGatedExecutor:
+
+    def execute(self, action, gate_result):
+        self.audit_log.record(action, gate_result)
+
+        if gate_result.decision == "continue":
+            pass  # no-op, resume training
+
+        elif gate_result.decision == "adjust_lr":
+            self.trainer_client.patch_trainjob_lr(action.trainjob_name, action.new_lr)
+            self.audit_log.record_outcome(action, "LR_ADJUSTED", gate_result.formula)
+
+        elif gate_result.decision == "early_stop":
+            self.trainer_client.delete_trainjob(action.trainjob_name)
+            self.audit_log.record_outcome(action, "EARLY_STOPPED", gate_result.formula)
 ```
+
+Every action — including "continue" — is logged with the KAN's score and formula, so the audit trail shows *why* the job was left running just as clearly as why it was stopped.
 
 ---
 
-## 6. Dataset: K-RAD (K8s Risk Action Dataset)
+## 6. Dataset & Training Signal
 
-### 6.1 Data Generation
+### 6.1 Primary: Real Training Runs
 
-Using `minikube` cluster + automated attack/benign scenario simulation:
+- A small CPU-friendly model (e.g. a small CNN on Fashion-MNIST, or fine-tuning a small transformer like DistilBERT on a small text classification subset) is trained via a real Kubeflow `TrainJob` on the local cluster
+- Loss/gradient/LR are logged at each epoch and become the real feature stream the KAN gate consumes
+- Multiple runs (with different seeds, LR schedules, and injected "bad" runs that should plateau early) build up a labeled dataset of decision points
 
-**Benign scenarios (70% of dataset):**
-- Normal rolling deployments
-- ConfigMap updates
-- HPA scaling events
-- Certificate rotations
+### 6.2 Secondary: Synthetic Generator (toggle, not default)
 
-**Attack / anomaly scenarios (30% of dataset):**
-- RBAC privilege escalation (binding ClusterAdmin to service account)
-- Deleting network policies silently
-- Launching privileged containers
-- Accessing secrets outside service scope
-- API server audit log tampering
+- Generates loss curves as exponential decay + noise, with an option to inject a plateau at a chosen epoch
+- Used for (a) fast iteration on the KAN gate before real training infra is ready, and (b) reproducing specific edge cases (e.g. "what does the gate do on a curve that plateaus then recovers?") that are hard to control for in real runs
+- Exposed via a `--synthetic` CLI flag and a toggle button in the dashboard — never the default data source
 
-### 6.2 Labeling Methodology
+### 6.3 Labeling Methodology
 
-Risk labels assigned using:
-1. **CIS Kubernetes Benchmark v1.9** — defines security levels for each K8s operation
-2. **MITRE ATT&CK for Containers** — maps K8s actions to attack techniques
-3. **RBAC Blast Radius Calculator** — measures downstream impact of each change
-
-### 6.3 Dataset Statistics (Target)
-
-| Risk Level | Count | % |
-|------------|-------|---|
-| Safe (95) | 3,500 | 35% |
-| Low (75) | 2,500 | 25% |
-| Medium (50) | 2,000 | 20% |
-| High (20) | 1,500 | 15% |
-| Critical (5) | 500 | 5% |
-| **Total** | **10,000** | **100%** |
+Decision-point labels come from:
+1. A simple rule-based reference policy (e.g. "stop if no improvement in last K epochs and remaining budget < threshold") as an initial weak label source
+2. Manual review/correction of a sample of labeled points by the research team
+3. Cross-checking against what Hyperband/ASHA would have decided at the same point, for baseline comparison
 
 ---
 
@@ -256,40 +209,35 @@ Risk labels assigned using:
 
 | Metric | Definition | Target |
 |--------|-----------|--------|
-| **Trust Score Accuracy** | Spearman correlation with expert labels | > 0.85 |
-| **MTTR Improvement** | Time to remediate vs manual ops | > 40% reduction |
-| **False Negative Rate** | Unsafe actions auto-approved | < 2% |
-| **False Positive Rate** | Safe actions blocked | < 15% |
-| **TFF (Trust Formula Faithfulness)** | % of formula terms that match SHAP feature importance | > 70% |
-| **User Study Score** | DevOps engineers rate formula readability 1-5 | > 3.5/5 |
+| **Decision Accuracy** | Agreement with expert/reference-policy labels | > 0.85 |
+| **GPU-Hours Saved** | vs. manual babysitting baseline, same final accuracy | > 30% reduction |
+| **False Early-Stop Rate** | Jobs stopped that would have kept improving | < 10% |
+| **Wasted-Compute Rate** | Jobs kept running well past plateau | < 15% |
+| **Formula Faithfulness** | % of formula's dominant term matching the feature that actually drove the decision | > 70% |
+| **User Study Score** | ML practitioners rate formula readability 1-5 | > 3.5/5 |
 
 ### 7.2 Baselines
 
 | Baseline | Description |
-|----------|-------------|
-| **Static Rules** | CIS Benchmark ruleset only (no ML) |
-| **MLP Classifier** | Same 8 features, standard neural network |
-| **Random Forest** | Ensemble baseline |
-| **KubeIntellect HITL** | Binary approve/reject gate |
-| **KAN-KubeAgent (Ours)** | KAN trust scoring |
+|----------|--------------|
+| **Manual** | Fixed-epoch training, no early stopping |
+| **Hyperband** | Standard bandit-based early stopping |
+| **ASHA** | Asynchronous successive halving |
+| **MLP Gate** | Same 5 features, standard neural network gate (no formula) |
+| **KAN-KubeAgent (Ours)** | KAN-gated agentic control |
 
 ### 7.3 Experimental Environment
 
 ```yaml
-# Cluster setup
-clusters:
-  - name: dev-cluster
-    nodes: 3
-    workload: web-microservices
-    
-  - name: ml-cluster  
-    nodes: 4
-    workload: pytorch-training-jobs
-    
-  - name: prod-sim-cluster
-    nodes: 5
-    workload: mixed (stateful + stateless)
-    
-tool: minikube (local) / kind (CI)
-k8s_version: 1.30+
+cluster:
+  tool: minikube (local dev)
+  k8s_version: 1.30+
+  crds: kubeflow-trainer (TrainJob)
+
+training_job:
+  compute: CPU-only (no GPU cluster dependency)
+  model: small CNN (Fashion-MNIST) or small transformer fine-tune
+  runs: multiple seeds + injected bad-run scenarios
+
+agent_llm: Claude API (via LangGraph)
 ```
