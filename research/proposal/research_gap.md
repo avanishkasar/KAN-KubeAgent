@@ -2,95 +2,89 @@
 
 ## 1. Formal Gap Statement
 
-### Gap 1 — The "Explainability Void" in Autonomous Kubernetes Agents
+### Gap 1 — No Interpretable Justification for Autonomous Training-Lifecycle Decisions
 
 **Evidence from literature:**
-- KubeIntellect (arXiv:2509.02449) achieves 93% query resolution but uses a binary HITL gate for ALL mutations
-- The paper explicitly states: *"all mutating operations require human approval"* — acknowledging that the system cannot self-certify safety
-- No existing paper provides a mathematical justification for *why* an autonomous K8s action is safe to apply
+- Hyperband (arXiv:1603.06560) and ASHA (arXiv:1810.05934) both stop underperforming training runs early, but the stopping rule is a bandit-style resource allocation score — there is no human-readable justification for any individual stop decision
+- Population Based Training (PBT) and similar schedulers optimize hyperparameters online but likewise produce no inspectable reasoning trail
+- No existing fine-tuning controller — bandit-based, RL-based, or LLM-based — outputs a symbolic formula explaining *why* a specific stop/adjust/continue decision was made
 
-**Why this matters:**  
-A 2026 CNCF survey found that the #1 blocker for production deployment of autonomous K8s agents is "lack of auditable decision trails for security-sensitive operations." Engineers won't trust an agent that can't explain itself.
+**Why this matters:**
+Practitioners routinely override or ignore automated early-stopping because they cannot verify the reasoning behind it, wasting the GPU-hours the automation was meant to save. A decision that can be read and checked in one line ("stopped because loss_plateau_score=0.91 and remaining budget=8 GPU-hours") is far more trustworthy than a black-box bandit score.
 
-**Our contribution:**  
-A KAN-based trust layer that produces an inspectable symbolic formula for every trust decision — turning "the agent said it's safe" into "the formula `0.8·f(ns_risk) - 0.4·g(blast_radius) = 72` says it's safe."
+**Our contribution:**
+A KAN-based gating layer that produces an inspectable symbolic formula for every continue/adjust/stop decision — turning "the scheduler decided to stop" into "the formula `0.91·plateau(loss_slope) + 0.12·lr_decay_benefit − 0.40·remaining_gpu_hours = stop` says to stop."
 
 ---
 
-### Gap 2 — KAN Has Never Been Used Inside an Agent Loop
+### Gap 2 — KAN Has Never Been Used Inside an Agentic Training-Control Loop
 
 **Evidence from literature:**
-- All 50+ KAN papers (Liu et al. 2024; KAN-MID; GloroKAN; TKAN; etc.) use KAN as a **standalone predictor**
-- KAN RL Policy paper (arXiv:2506.16392) uses KAN for network load-balancing *policy* — but still as a standalone model, not as a sub-component in an LLM-orchestrated multi-agent system
-- Zero papers place a KAN *inside* an agent's decision pipeline as a gatekeeper/verifier
+- All KAN papers to date (Liu et al. 2024; KAN-MID; GloroKAN; TKAN; the KAN RL-policy paper at arXiv:2506.16392) use KAN as a **standalone predictor or policy network**
+- The KAN RL-policy paper applies KAN to network load-balancing decisions, but as a single model — not as a gating sub-component inside a multi-agent, LLM-orchestrated system
+- Zero papers place a KAN *inside* an agent's decision pipeline as a gate that agents must pass every proposed action through
 
-**Why this matters:**  
-Using KAN as a verification layer rather than a primary predictor is a fundamentally different architectural role that unlocks new capabilities (real-time auditing, formula-based safety certificates) that standalone KAN models can't provide.
+**Why this matters:**
+Using KAN as a gate rather than the primary decision-maker is a different architectural role: agents handle observation and reasoning (what's happening, what might help), while KAN handles verification (is this specific action justified by the numbers). This separation is what makes the system both agentic *and* auditable.
 
-**Our contribution:**  
-First paper to use KAN as a **verification sub-component** inside an LLM-agent loop, establishing a new pattern for trustworthy agentic AI.
+**Our contribution:**
+First system to use KAN as a **gating sub-component** inside an LLM-agent loop that controls a real Kubernetes-native training job, establishing a reusable pattern for trustworthy agentic MLOps.
 
 ---
 
-### Gap 3 — No Kubernetes-Specific Security Dataset with Labeled Risk Ground Truth
+### Gap 3 — No Agentic System Operates a Real Kubernetes-Native Training CRD End-to-End
 
 **Evidence from literature:**
-- Kubernetes anomaly detection papers (arXiv:2503.14114, etc.) generate synthetic datasets but don't label individual *actions* with risk scores
-- CICIDS2017 and UNSW-NB15 cover general network intrusion but are not K8s-native
-- No paper has published a labeled dataset of K8s audit log events with expert-assigned risk scores
+- Hyperband/ASHA implementations (Ray Tune, Optuna) typically run as a standalone Python process managing trials directly — they are not built around a Kubernetes-native training abstraction like Kubeflow's `TrainJob` CRD
+- Multi-agent CloudOps frameworks (e.g. MOYA, arXiv:2501.08243) demonstrate general cloud-operations agents but do not target the ML fine-tuning lifecycle specifically, nor gate their actions through an interpretable verifier
+- No paper combines: (a) a real, actively maintained K8s training CRD, (b) a multi-agent observation/decision loop, and (c) an interpretable gate between proposal and execution
 
-**Why this matters:**  
-You can't train a KAN trust layer without ground-truth risk labels for K8s operations.
+**Why this matters:**
+Building on `TrainJob` (rather than a bespoke script) means the system's actions are real Kubernetes operations — patches and deletes against a live CRD — not a simulation, and the "why Kubernetes" justification is concrete rather than incidental.
 
-**Our contribution:**  
-We synthesise a **K8s Risk Action Dataset (K-RAD)** — 10,000 simulated K8s API events labeled as [low/medium/high/critical] risk by mapping to RBAC privilege levels, CIS Kubernetes Benchmark controls, and MITRE ATT&CK for Containers.
+**Our contribution:**
+An agentic controller that observes and patches a real Kubeflow `TrainJob`, with every mutating action passing through the KAN gate before it touches the cluster.
 
 ---
 
 ## 2. Novelty Claims (In Priority Order)
 
 ### Claim 1 (Primary — Architectural)
-> **"We are the first to use a Kolmogorov-Arnold Network as a trust verification layer inside an LLM-orchestrated multi-agent system."**
+> **"We are the first to use a Kolmogorov-Arnold Network as an interpretable gating layer inside an LLM-orchestrated multi-agent training-lifecycle controller."**
 
-Strength: Very strong. Zero prior art.
+Strength: Very strong. Zero prior art combines these.
 
 ### Claim 2 (Secondary — Applied)
-> **"We are the first to apply KAN to Kubernetes-native security audit log data for autonomous action trust scoring."**
+> **"We are the first to apply KAN-gated agentic control to a real Kubeflow `TrainJob`, producing a formula-justified decision for every continue/adjust-LR/early-stop action."**
 
-Strength: Strong. KAN has been applied to cloud/network security in general, but never to K8s-specific audit logs or to action trust scoring.
+Strength: Strong. KAN has been applied to policy and control tasks in general, but never to K8s-native fine-tuning lifecycle management.
 
-### Claim 3 (Tertiary — Dataset)
-> **"We introduce K-RAD, the first labeled dataset of Kubernetes API audit events annotated with risk scores derived from CIS Benchmark and MITRE ATT&CK for Containers."**
+### Claim 3 (Tertiary — Evaluation)
+> **"We compare KAN-gated decisions against Hyperband/ASHA on both GPU-hours saved and formula faithfulness (does the symbolic formula's dominant term match the feature that actually drove the decision)."**
 
-Strength: Moderate. Dataset papers are valued but the labeling methodology must be rigorous.
-
-### Claim 4 (Evaluation — Metric)
-> **"We introduce Trust Formula Faithfulness (TFF), a novel metric for evaluating whether the KAN's symbolic formula accurately reflects its numerical trust decision."**
-
-Strength: Moderate. Evaluation metric contributions are secondary but add value.
+Strength: Moderate-to-strong. Extends explainability evaluation methodology to the fine-tuning scheduling domain, where it hasn't previously been applied.
 
 ---
 
 ## 3. Research Questions
 
-**RQ1 (Primary):** Can a KAN trust layer accurately distinguish between safe and unsafe Kubernetes remediation actions, and does its symbolic formula output match human expert assessments?
+**RQ1 (Primary):** Can a KAN gate accurately decide when to continue, adjust learning rate, or early-stop a real fine-tuning job, and does its symbolic formula match what a human expert would point to as the deciding factor?
 
-**RQ2:** How does a KAN-gated autonomous agent compare to (a) fully manual operations and (b) a static rule-gate in Mean Time to Remediation (MTTR)?
+**RQ2:** How does a KAN-gated agentic controller compare to (a) manual babysitting and (b) Hyperband/ASHA in GPU-hours saved for a given final-accuracy target?
 
-**RQ3:** What is the false-positive rate (safe actions incorrectly blocked) and false-negative rate (unsafe actions incorrectly approved) of the KAN trust layer?
+**RQ3:** What is the false-early-stop rate (jobs stopped that would have kept improving) and the wasted-compute rate (jobs kept running well past their plateau) for the KAN gate versus the baselines?
 
-**RQ4:** Are the symbolic formulas learned by the KAN interpretable to domain experts (DevOps/Security engineers), as measured by a user study?
+**RQ4:** Are the symbolic formulas learned by the KAN interpretable to ML practitioners, as measured by a small user study?
 
 ---
 
 ## 4. Comparison to Prior Art
 
-| Criterion | KubeIntellect | KAN-MID | KAN RL Policy | **Ours (KAN-KubeAgent)** |
-|-----------|--------------|---------|---------------|-------------------------|
-| Kubernetes-specific | ✅ | ❌ | ❌ | ✅ |
-| Agentic AI | ✅ | ❌ | Partial | ✅ |
-| KAN used | ❌ | ✅ | ✅ | ✅ |
-| Explainable decisions | ❌ | Partial | Partial | ✅ Full formula |
-| Autonomous mutation | Blocked (HITL) | N/A | N/A | ✅ Risk-gated |
-| Formal safety cert | ❌ | ❌ | ❌ | ✅ Lipschitz bound |
-| K8s-native dataset | ❌ | ❌ | ❌ | ✅ K-RAD |
+| Criterion | Hyperband/ASHA | PBT | KAN RL-Policy | **Ours (KAN-KubeAgent)** |
+|-----------|-----------------|-----|----------------|---------------------------|
+| Kubernetes-native (real CRD) | ❌ | ❌ | ❌ | ✅ Kubeflow `TrainJob` |
+| Agentic (multi-step reasoning) | ❌ | ❌ | Partial | ✅ |
+| KAN used | ❌ | ❌ | ✅ | ✅ |
+| Explainable decisions | ❌ | ❌ | Partial | ✅ Full formula per decision |
+| Autonomous control action | ✅ (stop only) | ✅ | N/A | ✅ Continue / adjust LR / stop |
+| Runs on local infra, no GPU cluster required | ✅ | ✅ | N/A | ✅ |
