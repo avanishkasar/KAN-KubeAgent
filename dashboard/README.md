@@ -58,6 +58,18 @@ the GPU tile just says so. No configuration needed to move between
 machines - the same `uvicorn dashboard.backend.app:app` command works
 whether there's a GPU or not.
 
+**Verified on real hardware, including a real gotcha:** tested on a
+machine with an NVIDIA RTX 4070 Laptop GPU - the GPU tile correctly showed
+real live utilization/memory/temperature. But `torch.cuda.is_available()`
+was `False` and training ran on CPU anyway, because a plain
+`pip install torch` pulls the CPU-only wheel from PyPI by default, GPU or
+not. See `training/requirements.txt` for the fix (installing from
+PyTorch's CUDA index instead) - `training/fashion_mnist_cnn.py` now also
+logs a warning to the live event log if it detects this exact mismatch
+(a GPU present via `nvidia-smi`, but no CUDA support in the installed
+torch), so it's diagnosable from the dashboard itself rather than a silent
+CPU fallback.
+
 ## Once a real Kubernetes TrainJob is available
 
 `dashboard/backend/live.py` currently drives
