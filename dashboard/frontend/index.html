@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAN-KubeAgent Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --surface-2: #ffffff;
+    --border: #e3e1da;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #85837c;
+    --series-1: #2a78d6;
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --surface-2: #212120;
+      --border: #34332f;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8d84;
+      --series-1: #3987e5;
+      --status-good: #0ca30c;
+      --status-warning: #fab219;
+      --status-serious: #ec835a;
+      --status-critical: #d03b3b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #212120;
+    --border: #34332f;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8d84;
+    --series-1: #3987e5;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: var(--surface-0);
+    color: var(--text-primary);
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0; max-width: 640px; }
+  .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary);
+    border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+
+  form.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  form.controls label { display: flex; flex-direction: column; font-size: 11px; color: var(--text-muted); gap: 4px; }
+  form.controls input { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 6px; padding: 6px 8px; font-size: 13px; width: 110px; }
+  form.controls button { background: var(--series-1); color: white; border: none; border-radius: 6px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  form.controls button:disabled { opacity: 0.5; cursor: default; }
+  .toggle-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .stat-tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .stat-tile .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-tile .value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+  .stat-tile .value.mono { font-family: var(--mono); font-size: 15px; }
+
+  .formula-box { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--text-secondary);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;
+    word-break: break-all; }
+
+  svg.chart { width: 100%; height: 300px; display: block; }
+  .axis-line { stroke: var(--border); stroke-width: 1; }
+  .axis-label { fill: var(--text-muted); font-size: 10px; font-family: var(--sans); }
+  .loss-line { fill: none; stroke: var(--series-1); stroke-width: 2; }
+  .hover-crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
+  .hover-dot { fill: var(--series-1); opacity: 0; }
+  .decision-marker { stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+  #tooltip { position: fixed; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--text-primary); box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    display: none; z-index: 10; max-width: 260px; }
+  #tooltip .t-row { display: flex; justify-content: space-between; gap: 12px; }
+  #tooltip .t-label { color: var(--text-muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.03em; }
+  td.formula-cell { font-family: var(--mono); font-size: 11.5px; color: var(--text-secondary); max-width: 420px; word-break: break-all; }
+  td.rationale-cell { color: var(--text-muted); font-size: 11.5px; max-width: 260px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; border: 1px solid transparent; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .badge.continue { color: var(--status-good); border-color: color-mix(in srgb, var(--status-good) 40%, transparent); }
+  .badge.continue .dot { background: var(--status-good); }
+  .badge.adjust_lr { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 50%, transparent); }
+  .badge.adjust_lr .dot { background: var(--status-warning); }
+  .badge.early_stop { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 40%, transparent); }
+  .badge.early_stop .dot { background: var(--status-critical); }
+
+  .empty-state { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; }
+  .error-banner { background: var(--status-critical); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>KAN-KubeAgent — Fine-Tuning Job Optimizer</h1>
+      <p class="subtitle">Live loss curve with every agent decision gated by the KAN, and the symbolic
+        formula that justified it. See <code>research/proposal/methodology_draft.md</code> for the design.</p>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" type="button">Toggle theme</button>
+  </header>
+
+  <div class="error-banner" id="error-banner"></div>
+
+  <div class="panel">
+    <form class="controls" id="run-form">
+      <label>Job name
+        <input type="text" name="job_name" value="finetune-demo-01">
+      </label>
+      <label>Epochs
+        <input type="number" name="epochs" value="30" min="5" max="100">
+      </label>
+      <label>Check every
+        <input type="number" name="check_every" value="3" min="1" max="10">
+      </label>
+      <label>Seed
+        <input type="number" name="seed" value="7">
+      </label>
+      <div class="toggle-row">
+        <input type="checkbox" id="synthetic-plateau" checked>
+        <label for="synthetic-plateau" style="color:var(--text-secondary); font-size:12px;">Inject plateau (synthetic run)</label>
+      </div>
+      <label>Plateau at epoch
+        <input type="number" name="plateau_at_epoch" value="12" min="1" max="100">
+      </label>
+      <button type="submit" id="run-btn">Run pipeline</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="stat-row" id="stat-row">
+      <div class="stat-tile"><div class="label">Status</div><div class="value" id="stat-phase">—</div></div>
+      <div class="stat-tile"><div class="label">Epoch</div><div class="value" id="stat-epoch">—</div></div>
+      <div class="stat-tile"><div class="label">GPU-hours used</div><div class="value" id="stat-gpu">—</div></div>
+      <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="stat-decision">—</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+      <strong style="font-size:13px;">Loss curve &amp; gate decisions</strong>
+      <span style="font-size:11px; color:var(--text-muted);">Hover for details</span>
+    </div>
+    <svg class="chart" id="chart" viewBox="0 0 1000 300" preserveAspectRatio="none"></svg>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--series-1)"></span>Loss</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--status-good)"></span>Continue</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--status-warning)"></span>Adjust LR</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--status-critical)"></span>Early stop</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <strong style="font-size:13px;">Current KAN gate formula</strong>
+    <div class="formula-box" id="gate-formula" style="margin-top:10px;">Loading…</div>
+  </div>
+
+  <div class="panel">
+    <strong style="font-size:13px;">Decision audit log</strong>
+    <div style="overflow-x:auto; margin-top:10px;">
+      <table>
+        <thead>
+          <tr><th>Epoch</th><th>Decision</th><th>Score</th><th>Outcome</th><th>Formula</th><th>LLM proposal</th></tr>
+        </thead>
+        <tbody id="audit-body"></tbody>
+      </table>
+      <div class="empty-state" id="audit-empty">Run the pipeline to see decisions here.</div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const API_BASE = window.location.origin;
+let lastRun = null;
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const root = document.documentElement;
+  const current = root.getAttribute('data-theme');
+  root.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+});
+
+document.getElementById('synthetic-plateau').addEventListener('change', (e) => {
+  const plateauInput = document.querySelector('input[name="plateau_at_epoch"]');
+  plateauInput.disabled = !e.target.checked;
+});
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function loadGateFormula() {
+  try {
+    const res = await fetch(`${API_BASE}/api/gate`);
+    const data = await res.json();
+    document.getElementById('gate-formula').textContent = data.formula;
+  } catch (e) {
+    document.getElementById('gate-formula').textContent = 'Could not load gate formula — is the backend running?';
+  }
+}
+
+function decisionLabel(d) {
+  return { continue: 'Continue', adjust_lr: 'Adjust LR', early_stop: 'Early stop' }[d] || d;
+}
+
+function renderStats(run) {
+  document.getElementById('stat-phase').textContent = run.phase;
+  document.getElementById('stat-epoch').textContent = `${run.final_epoch} / ${run.total_epochs}`;
+  document.getElementById('stat-gpu').textContent = `${run.gpu_hours_used.toFixed(1)} / ${run.gpu_hours_budget.toFixed(1)} hrs`;
+  const last = run.audit_log[run.audit_log.length - 1];
+  document.getElementById('stat-decision').innerHTML = last
+    ? `<span class="badge ${last.decision}"><span class="dot"></span>${decisionLabel(last.decision)}</span>`
+    : '—';
+}
+
+function renderTable(run) {
+  const body = document.getElementById('audit-body');
+  const empty = document.getElementById('audit-empty');
+  body.innerHTML = '';
+  if (!run.audit_log.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  run.audit_log.forEach((entry) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${entry.epoch_index}</td>
+      <td><span class="badge ${entry.decision}"><span class="dot"></span>${decisionLabel(entry.decision)}</span></td>
+      <td>${entry.gate_score.toFixed(1)}</td>
+      <td>${entry.outcome}</td>
+      <td class="formula-cell">${entry.gate_formula}</td>
+      <td class="rationale-cell">${entry.llm_proposal}: ${entry.llm_rationale}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function renderChart(run) {
+  const svg = document.getElementById('chart');
+  svg.innerHTML = '';
+  const losses = run.loss_history;
+  if (!losses.length) return;
+
+  const W = 1000, H = 300, padL = 40, padR = 20, padT = 16, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const minLoss = Math.min(...losses), maxLoss = Math.max(...losses);
+  const range = (maxLoss - minLoss) || 1;
+
+  const x = (epoch) => padL + (epoch / Math.max(1, losses.length - 1)) * plotW;
+  const y = (loss) => padT + plotH - ((loss - minLoss) / range) * plotH;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs) => {
+    const el = document.createElementNS(ns, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  };
+
+  // axes
+  svg.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT, x2: padL, y2: padT + plotH }));
+  svg.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT + plotH, x2: padL + plotW, y2: padT + plotH }));
+  const yLabelTop = mk('text', { class: 'axis-label', x: 4, y: padT + 4 }); yLabelTop.textContent = maxLoss.toFixed(2);
+  const yLabelBot = mk('text', { class: 'axis-label', x: 4, y: padT + plotH }); yLabelBot.textContent = minLoss.toFixed(2);
+  svg.appendChild(yLabelTop); svg.appendChild(yLabelBot);
+
+  // loss line
+  const pathD = losses.map((l, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(l)}`).join(' ');
+  svg.appendChild(mk('path', { class: 'loss-line', d: pathD }));
+
+  // decision markers
+  const statusColor = { continue: 'var(--status-good)', adjust_lr: 'var(--status-warning)', early_stop: 'var(--status-critical)' };
+  run.audit_log.forEach((entry) => {
+    const epoch = Math.max(0, Math.min(losses.length - 1, entry.epoch_index));
+    const marker = mk('circle', {
+      class: 'decision-marker', cx: x(epoch), cy: y(losses[epoch]), r: 6,
+      fill: statusColor[entry.decision] || 'var(--text-muted)',
+    });
+    const title = mk('title', {});
+    title.textContent = `Epoch ${epoch}: ${decisionLabel(entry.decision)} (score ${entry.gate_score.toFixed(1)})`;
+    marker.appendChild(title);
+    svg.appendChild(marker);
+  });
+
+  // interaction layer
+  const hoverLine = mk('line', { class: 'hover-crosshair', x1: 0, y1: padT, x2: 0, y2: padT + plotH });
+  const hoverDot = mk('circle', { class: 'hover-dot', r: 4 });
+  svg.appendChild(hoverLine);
+  svg.appendChild(hoverDot);
+
+  const tooltip = document.getElementById('tooltip');
+  const overlay = mk('rect', { x: padL, y: padT, width: plotW, height: plotH, fill: 'transparent' });
+  overlay.addEventListener('mousemove', (evt) => {
+    const rect = svg.getBoundingClientRect();
+    const relX = ((evt.clientX - rect.left) / rect.width) * W;
+    const epoch = Math.round(((relX - padL) / plotW) * (losses.length - 1));
+    const clamped = Math.max(0, Math.min(losses.length - 1, epoch));
+    const px = x(clamped), py = y(losses[clamped]);
+    hoverLine.setAttribute('x1', px); hoverLine.setAttribute('x2', px); hoverLine.style.opacity = 1;
+    hoverDot.setAttribute('cx', px); hoverDot.setAttribute('cy', py); hoverDot.style.opacity = 1;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${evt.clientX + 14}px`;
+    tooltip.style.top = `${evt.clientY + 14}px`;
+    tooltip.innerHTML = `<div class="t-row"><span class="t-label">Epoch</span><strong>${clamped}</strong></div>
+      <div class="t-row"><span class="t-label">Loss</span><strong>${losses[clamped].toFixed(4)}</strong></div>`;
+  });
+  overlay.addEventListener('mouseleave', () => {
+    hoverLine.style.opacity = 0; hoverDot.style.opacity = 0; tooltip.style.display = 'none';
+  });
+  svg.appendChild(overlay);
+}
+
+async function runPipeline(evt) {
+  evt.preventDefault();
+  showError('');
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+
+  const form = new FormData(evt.target);
+  const plateauEnabled = document.getElementById('synthetic-plateau').checked;
+  const payload = {
+    job_name: form.get('job_name'),
+    epochs: parseInt(form.get('epochs'), 10),
+    check_every: parseInt(form.get('check_every'), 10),
+    seed: parseInt(form.get('seed'), 10),
+    plateau_at_epoch: plateauEnabled ? parseInt(form.get('plateau_at_epoch'), 10) : null,
+    synthetic: true,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/runs`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+    lastRun = await res.json();
+    renderStats(lastRun);
+    renderChart(lastRun);
+    renderTable(lastRun);
+  } catch (e) {
+    showError(`Run failed: ${e.message}. Is the backend running? See dashboard/README.md.`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run pipeline';
+  }
+}
+
+document.getElementById('run-form').addEventListener('submit', runPipeline);
+loadGateFormula();
+</script>
+</body>
+</html>
