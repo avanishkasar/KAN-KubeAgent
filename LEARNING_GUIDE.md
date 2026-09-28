@@ -295,7 +295,8 @@ Step 3 — Hidden node goes through next layer's edge functions:
 
 Step 4 — Final node sums → stop score:
 
-  stop_score = sigmoid(0.55) × 100 = 63.4
+  stop_score = 63.4   (the gate is trained directly on the 0-100 scale,
+                        so this final sum IS the score - no extra squashing)
 ```
 
 **Result:** Stop score is 63.4 → falls in the "adjust learning rate" band, not full stop.
@@ -597,14 +598,13 @@ KAN Hidden Layer (3 nodes, each summing subsets):
   h₂ = φ₃+φ₄ = 0.31-0.24 = 0.07 → ψ₂(0.07) = 0.06
   h₃ = φ₅ (alone)                → ψ₃(0.09) = 0.08
 
-KAN Output Layer (1 node):
+KAN Output Layer (1 node, scaled during training to output directly on
+the 0-100 stop-score range - no sigmoid squashing needed or used):
 
-  raw_output = ψ_out(h₁ + h₂ + h₃)
+  stop_score = ψ_out(h₁ + h₂ + h₃)
              = ψ_out(0.71 + 0.06 + 0.08)
              = ψ_out(0.85)
-             = 1.45
-
-Stop Score = sigmoid(1.45) × 100 = 81.0 → "EARLY-STOP" band
+             = 81.0 → "EARLY-STOP" band
 ```
 
 ### After training, symbolic regression finds:
