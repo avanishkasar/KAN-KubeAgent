@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -22,6 +22,8 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from agents.graph import build_graph  # noqa: E402
 from agents.trainjob_client import MockTrainJobClient  # noqa: E402
+from dashboard.backend import hardware  # noqa: E402
+from dashboard.backend.live import session as live_session  # noqa: E402
 from kan_gate.gate import DEFAULT_CKPT_PATH, KANGate  # noqa: E402
 
 app = FastAPI(title="KAN-KubeAgent Dashboard API")
@@ -89,6 +91,53 @@ def gate_info():
         "loss_plateau_score", "gradient_trend", "lr_decay_benefit",
         "gpu_hours_remaining_vs_budget", "epochs_since_improvement",
     ]}
+
+
+@app.get("/api/hardware")
+def hardware_snapshot():
+    """One-off real hardware read, independent of any live run - used by
+    the frontend to show what this machine has (GPU or not) before you
+    even start a run."""
+    return hardware.sample()
+
+
+class LiveStartRequest(BaseModel):
+    job_name: str = "live-finetune-01"
+    epochs: int = 30
+    check_every: int = 3
+    lr: float = 2e-4
+    batch_size: int = 128
+    subset_size: int = 6000
+
+
+@app.post("/api/live/start")
+async def live_start(req: LiveStartRequest):
+    await live_session.start(
+        job_name=req.job_name, epochs=req.epochs, check_every=req.check_every,
+        lr=req.lr, batch_size=req.batch_size, subset_size=req.subset_size,
+    )
+    return {"status": "started", "job_name": req.job_name}
+
+
+@app.post("/api/live/stop")
+async def live_stop():
+    await live_session.stop()
+    return {"status": "stopped"}
+
+
+@app.get("/api/live/snapshot")
+def live_snapshot():
+    return live_session.snapshot
+
+
+@app.websocket("/api/live/stream")
+async def live_stream(ws: WebSocket):
+    await live_session.register(ws)
+    try:
+        while True:
+            await ws.receive_text()  # keepalive/ignored; client doesn't need to send anything
+    except WebSocketDisconnect:
+        live_session.unregister(ws)
 
 
 frontend_dir = Path(__file__).resolve().parents[1] / "frontend"
