@@ -33,9 +33,16 @@ for local development.
 ## Swapping in a real TrainJob
 
 `agents/trainjob_client.py` defines the `TrainJobClient` interface that
-`agents/graph.py` depends on. `MockTrainJobClient` is the only
-implementation today; a `KubeflowTrainJobClient` wrapping
-`kubeflow.trainer.TrainerClient` will be added once Minikube + Kubeflow
-Trainer are set up (tracked task: "Set up Minikube + Kubeflow Trainer +
-wire real TrainJob"). `agents/graph.py` does not need to change when that
-lands — it only depends on the `TrainJobClient` protocol.
+`agents/graph.py` depends on. `agents/kubeflow_client.py::KubeflowTrainJobClient`
+implements it against a real Kubeflow `TrainJob` (see `k8s/README.md` for
+cluster setup) - `agents/graph.py` does not change when you swap it in for
+`MockTrainJobClient`.
+
+**Status:** `KubeflowTrainJobClient` is written and passes a structural
+protocol check (same method signatures as `MockTrainJobClient`), but has
+**not** been exercised against a live cluster - the sandbox this repo was
+built in blocks `registry.k8s.io`, so Minikube cannot start there (see
+`k8s/README.md`). Validate it against your own cluster before relying on
+it; the metric-parsing (`_parse_metrics`) and LR-override ConfigMap
+handshake with `training/fashion_mnist_cnn.py` are the most likely spots
+to need small fixes against a real Trainer install.
