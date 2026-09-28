@@ -19,10 +19,14 @@ from kan_gate.reference_policy import decision_to_score, reference_decision
 from kan_gate.synthetic import generate_synthetic_history
 
 
-def build_synthetic_dataset(n_runs: int = 60, seed: int = 0):
+def build_synthetic_dataset(n_runs: int = 120, seed: int = 0):
     rows = []
     for i in range(n_runs):
-        plateau_at = None if i % 3 == 0 else 5 + (i % 20)
+        # Roughly a third of runs never plateau within the horizon (healthy
+        # run), the rest plateau at a spread of epochs - including early
+        # plateaus, which the epoch-5 decision point below must learn to
+        # tell apart from a healthy run's early epochs.
+        plateau_at = None if i % 3 == 0 else 3 + (i % 26)
         history = generate_synthetic_history(
             num_epochs=30,
             plateau_at_epoch=plateau_at,
@@ -30,8 +34,10 @@ def build_synthetic_dataset(n_runs: int = 60, seed: int = 0):
             gpu_hours_budget=10.0,
             seed=seed + i,
         )
-        # Sample a handful of decision points from each run's trajectory.
-        for cutoff in (10, 15, 20, 25, 29):
+        # Sample decision points across each run's trajectory, including
+        # early epochs, so the gate learns "early != plateaued" and not
+        # just "early == default to stop".
+        for cutoff in (4, 7, 10, 15, 20, 25, 29):
             partial = TrainingHistory(
                 loss_history=history.loss_history[: cutoff + 1],
                 grad_norm_history=history.grad_norm_history[: cutoff + 1],

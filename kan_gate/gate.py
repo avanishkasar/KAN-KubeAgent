@@ -99,7 +99,13 @@ class KANGate:
         x = self.encode(features)
         with torch.no_grad():
             raw = self.model(x)
-        return torch.sigmoid(raw).item() * 100
+        # The model is trained directly against 0-100 score labels (see
+        # reference_policy.decision_to_score), so its raw output already IS
+        # the score - no extra squashing here. An earlier version applied
+        # sigmoid(raw)*100 on top of that, which silently saturated nearly
+        # every decision to ~100 once the raw output exceeded ~5. Clamp
+        # only to guard against out-of-range extrapolation.
+        return max(0.0, min(100.0, raw.item()))
 
     def decide(self, features: dict[str, float]) -> GateResult:
         score = self.raw_score(features)

@@ -100,8 +100,10 @@ class KANGate:
     def decide(self, features: dict) -> GateResult:
         x = self.encode_features(features)
 
+        # Trained directly against 0-100 score labels, so the raw output
+        # IS the score - clamped only to guard extrapolation, not squashed.
         raw_output = self.model(x)
-        stop_score = torch.sigmoid(raw_output) * 100
+        stop_score = torch.clamp(raw_output, 0, 100)
 
         formula = self.model.symbolic_formula()
 
