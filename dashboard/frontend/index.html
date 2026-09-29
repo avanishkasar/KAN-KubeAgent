@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAN-KubeAgent Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --surface-2: #ffffff;
+    --border: #e3e1da;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #85837c;
+    --series-1: #2a78d6;
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #212120; --border: #34332f;
+      --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #8f8d84;
+      --series-1: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #212120; --border: #34332f;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #8f8d84;
+    --series-1: #3987e5;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); background: var(--surface-0); color: var(--text-primary); padding: 24px 16px 64px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0; max-width: 640px; }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary);
+    border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+
+  /* Mode slider */
+  .mode-slider { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 3px; margin-bottom: 18px; }
+  .mode-slider button { border: none; background: transparent; color: var(--text-secondary); font-size: 13px;
+    font-weight: 600; padding: 7px 18px; border-radius: 999px; cursor: pointer; }
+  .mode-slider button.active { background: var(--series-1); color: #ffffff; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+
+  form.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  form.controls label { display: flex; flex-direction: column; font-size: 11px; color: var(--text-muted); gap: 4px; }
+  form.controls input { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 6px; padding: 6px 8px; font-size: 13px; width: 110px; }
+  form.controls button { background: var(--series-1); color: white; border: none; border-radius: 6px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  form.controls button:disabled { opacity: 0.5; cursor: default; }
+  form.controls button.stop-btn { background: var(--status-critical); }
+  .toggle-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .stat-tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .stat-tile .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-tile .value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+  .stat-tile .value.mono { font-family: var(--mono); font-size: 15px; }
+  .stat-tile .bar-track { height: 5px; border-radius: 3px; background: var(--border); margin-top: 8px; overflow: hidden; }
+  .stat-tile .bar-fill { height: 100%; background: var(--series-1); border-radius: 3px; transition: width 0.4s ease; }
+  .stat-tile.gpu-off .value { color: var(--text-muted); font-size: 14px; }
+
+  .formula-box { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--text-secondary);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; word-break: break-all; }
+
+  svg.chart { width: 100%; height: 280px; display: block; }
+  .axis-line { stroke: var(--border); stroke-width: 1; }
+  .axis-label { fill: var(--text-muted); font-size: 10px; font-family: var(--sans); }
+  .loss-line { fill: none; stroke: var(--series-1); stroke-width: 2; }
+  .hover-crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
+  .hover-dot { fill: var(--series-1); opacity: 0; }
+  .decision-marker { stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+  #tooltip { position: fixed; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--text-primary); box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    display: none; z-index: 10; max-width: 260px; }
+  #tooltip .t-row { display: flex; justify-content: space-between; gap: 12px; }
+  #tooltip .t-label { color: var(--text-muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.03em; }
+  td.formula-cell { font-family: var(--mono); font-size: 11.5px; color: var(--text-secondary); max-width: 420px; word-break: break-all; }
+  td.rationale-cell { color: var(--text-muted); font-size: 11.5px; max-width: 260px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; border: 1px solid transparent; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .badge.continue { color: var(--status-good); border-color: color-mix(in srgb, var(--status-good) 40%, transparent); }
+  .badge.continue .dot { background: var(--status-good); }
+  .badge.adjust_lr { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 50%, transparent); }
+  .badge.adjust_lr .dot { background: var(--status-warning); }
+  .badge.early_stop { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 40%, transparent); }
+  .badge.early_stop .dot { background: var(--status-critical); }
+  .badge.idle { color: var(--text-muted); border-color: var(--border); }
+  .badge.idle .dot { background: var(--text-muted); }
+  .badge.running { color: var(--series-1); border-color: color-mix(in srgb, var(--series-1) 40%, transparent); }
+  .badge.running .dot { background: var(--series-1); }
+
+  .empty-state { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; }
+  .error-banner { background: var(--status-critical); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+
+  /* Live event log */
+  .log-panel { background: #0d0d0c; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    height: 260px; overflow-y: auto; font-family: var(--mono); font-size: 11.5px; line-height: 1.7; }
+  .log-line { white-space: pre-wrap; word-break: break-word; }
+  .log-line .ts { color: #6b6a64; margin-right: 8px; }
+  .log-line.info { color: #cfcec6; }
+  .log-line.process { color: #7fb0e0; }
+  .log-line.warning { color: var(--status-warning); }
+  .log-line.critical { color: #ff8a80; font-weight: 600; }
+
+  .note { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>KAN-KubeAgent — Fine-Tuning Job Optimizer</h1>
+      <p class="subtitle">Every agent decision is gated by the KAN and shown with the symbolic formula that
+        justified it. See <code>research/proposal/methodology_draft.md</code> for the design.</p>
+    </div>
+    <div class="header-actions">
+      <button class="theme-toggle" id="theme-toggle" type="button">Toggle theme</button>
+    </div>
+  </header>
+
+  <div class="mode-slider" id="mode-slider">
+    <button type="button" data-mode="live" class="active">Live</button>
+    <button type="button" data-mode="mock">Mock / Synthetic</button>
+  </div>
+
+  <div class="error-banner" id="error-banner"></div>
+
+  <!-- ============================= LIVE VIEW ============================= -->
+  <section class="view active" id="live-view">
+    <div class="panel">
+      <form class="controls" id="live-form">
+        <label>Job name<input type="text" name="job_name" value="live-finetune-01"></label>
+        <label>Epochs<input type="number" name="epochs" value="20" min="2" max="200"></label>
+        <label>Check every<input type="number" name="check_every" value="3" min="1" max="10"></label>
+        <label>Learning rate<input type="number" step="0.0001" name="lr" value="0.0002"></label>
+        <label>Batch size<input type="number" name="batch_size" value="128" min="8" max="512"></label>
+        <label>Subset size<input type="number" name="subset_size" value="4000" min="200" max="60000"></label>
+        <button type="submit" id="live-start-btn">Start real training</button>
+        <button type="button" id="live-stop-btn" class="stop-btn" disabled>Stop</button>
+      </form>
+      <p class="note">Runs a real local training subprocess (<code>training/fashion_mnist_cnn.py</code>) on this
+        machine's CPU/GPU — actual forward/backward passes, actual hardware load. If Fashion-MNIST can't be
+        downloaded, it trains on a synthetic-but-learnable dataset instead (same real training loop). See
+        <code>dashboard/README.md</code>.</p>
+    </div>
+
+    <div class="panel">
+      <div class="stat-row" id="live-stat-row">
+        <div class="stat-tile"><div class="label">Status</div><div class="value" id="live-stat-phase"><span class="badge idle"><span class="dot"></span>Idle</span></div></div>
+        <div class="stat-tile"><div class="label">Epoch</div><div class="value" id="live-stat-epoch">—</div></div>
+        <div class="stat-tile"><div class="label">CPU</div><div class="value" id="live-stat-cpu">—</div>
+          <div class="bar-track"><div class="bar-fill" id="live-stat-cpu-bar" style="width:0%"></div></div></div>
+        <div class="stat-tile"><div class="label">Memory</div><div class="value" id="live-stat-mem">—</div>
+          <div class="bar-track"><div class="bar-fill" id="live-stat-mem-bar" style="width:0%"></div></div></div>
+        <div class="stat-tile" id="live-stat-gpu-tile"><div class="label">GPU</div><div class="value" id="live-stat-gpu">—</div>
+          <div class="bar-track"><div class="bar-fill" id="live-stat-gpu-bar" style="width:0%"></div></div></div>
+        <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="live-stat-decision">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <strong style="font-size:13px;">Live loss curve &amp; gate decisions</strong>
+        <span style="font-size:11px; color:var(--text-muted);" id="live-chart-hint">Waiting for a run…</span>
+      </div>
+      <svg class="chart" id="live-chart" viewBox="0 0 1000 280" preserveAspectRatio="none"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--series-1)"></span>Loss</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-good)"></span>Continue</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-warning)"></span>Adjust LR</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-critical)"></span>Early stop</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <strong style="font-size:13px;">Live process &amp; decision log</strong>
+      <p class="note" style="margin-top:2px;">What's actually happening under the hood right now — process
+        lifecycle, hardware, and every KAN gate decision, as it happens.</p>
+      <div class="log-panel" id="live-log" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="panel">
+      <strong style="font-size:13px;">Decision audit log</strong>
+      <div style="overflow-x:auto; margin-top:10px;">
+        <table>
+          <thead><tr><th>Epoch</th><th>Decision</th><th>Score</th><th>Outcome</th><th>Formula</th><th>LLM proposal</th></tr></thead>
+          <tbody id="live-audit-body"></tbody>
+        </table>
+        <div class="empty-state" id="live-audit-empty">Start a live run to see decisions here.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= MOCK VIEW ============================= -->
+  <section class="view" id="mock-view">
+    <div class="panel">
+      <strong style="font-size:13px;">Mock / synthetic mode</strong>
+      <p class="note">No real process runs here — a synthetic loss curve (with an optional injected plateau) is
+        generated instantly and scored by the same real KAN gate. Useful for fast iteration and reproducing
+        specific edge cases without waiting on real training. See
+        <code>research/proposal/methodology_draft.md</code> Section 6.2.</p>
+    </div>
+
+    <div class="panel">
+      <form class="controls" id="run-form">
+        <label>Job name<input type="text" name="job_name" value="finetune-demo-01"></label>
+        <label>Epochs<input type="number" name="epochs" value="30" min="5" max="100"></label>
+        <label>Check every<input type="number" name="check_every" value="3" min="1" max="10"></label>
+        <label>Seed<input type="number" name="seed" value="7"></label>
+        <div class="toggle-row">
+          <input type="checkbox" id="synthetic-plateau" checked>
+          <label for="synthetic-plateau" style="color:var(--text-secondary); font-size:12px;">Inject plateau</label>
+        </div>
+        <label>Plateau at epoch<input type="number" name="plateau_at_epoch" value="12" min="1" max="100"></label>
+        <button type="submit" id="run-btn">Run pipeline</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="stat-row" id="stat-row">
+        <div class="stat-tile"><div class="label">Status</div><div class="value" id="stat-phase">—</div></div>
+        <div class="stat-tile"><div class="label">Epoch</div><div class="value" id="stat-epoch">—</div></div>
+        <div class="stat-tile"><div class="label">GPU-hours used*</div><div class="value" id="stat-gpu">—</div></div>
+        <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="stat-decision">—</div></div>
+      </div>
+      <p class="note">*Simulated budget accounting, not measured hardware — see the Live tab for real hardware numbers.</p>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <strong style="font-size:13px;">Loss curve &amp; gate decisions</strong>
+        <span style="font-size:11px; color:var(--text-muted);">Hover for details</span>
+      </div>
+      <svg class="chart" id="chart" viewBox="0 0 1000 280" preserveAspectRatio="none"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--series-1)"></span>Loss</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-good)"></span>Continue</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-warning)"></span>Adjust LR</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-critical)"></span>Early stop</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <strong style="font-size:13px;">Current KAN gate formula</strong>
+      <div class="formula-box" id="gate-formula" style="margin-top:10px;">Loading…</div>
+    </div>
+
+    <div class="panel">
+      <strong style="font-size:13px;">Decision audit log</strong>
+      <div style="overflow-x:auto; margin-top:10px;">
+        <table>
+          <thead><tr><th>Epoch</th><th>Decision</th><th>Score</th><th>Outcome</th><th>Formula</th><th>LLM proposal</th></tr></thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+        <div class="empty-state" id="audit-empty">Run the pipeline to see decisions here.</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const API_BASE = window.location.origin;
+const WS_BASE = API_BASE.replace(/^http/, 'ws');
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const root = document.documentElement;
+  root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function decisionLabel(d) {
+  return { continue: 'Continue', adjust_lr: 'Adjust LR', early_stop: 'Early stop' }[d] || d;
+}
+
+/* ---------- mode slider ---------- */
+document.getElementById('mode-slider').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-mode]');
+  if (!btn) return;
+  document.querySelectorAll('.mode-slider button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('live-view').classList.toggle('active', btn.dataset.mode === 'live');
+  document.getElementById('mock-view').classList.toggle('active', btn.dataset.mode === 'mock');
+});
+
+/* ---------- shared: incremental SVG line chart ---------- */
+function drawChart(svgEl, losses, decisions, epochIndexFn) {
+  svgEl.innerHTML = '';
+  if (!losses.length) return;
+  const W = 1000, H = 280, padL = 40, padR = 20, padT = 16, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const minLoss = Math.min(...losses), maxLoss = Math.max(...losses);
+  const range = (maxLoss - minLoss) || 1;
+  const denom = Math.max(1, losses.length - 1);
+  const x = (i) => padL + (i / denom) * plotW;
+  const y = (l) => padT + plotH - ((l - minLoss) / range) * plotH;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs) => { const el = document.createElementNS(ns, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el; };
+
+  svgEl.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT, x2: padL, y2: padT + plotH }));
+  svgEl.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT + plotH, x2: padL + plotW, y2: padT + plotH }));
+  const top = mk('text', { class: 'axis-label', x: 4, y: padT + 4 }); top.textContent = maxLoss.toFixed(2);
+  const bot = mk('text', { class: 'axis-label', x: 4, y: padT + plotH }); bot.textContent = minLoss.toFixed(2);
+  svgEl.appendChild(top); svgEl.appendChild(bot);
+
+  const pathD = losses.map((l, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(l)}`).join(' ');
+  svgEl.appendChild(mk('path', { class: 'loss-line', d: pathD }));
+
+  const statusColor = { continue: 'var(--status-good)', adjust_lr: 'var(--status-warning)', early_stop: 'var(--status-critical)' };
+  decisions.forEach((entry) => {
+    const epoch = Math.max(0, Math.min(losses.length - 1, epochIndexFn(entry)));
+    const marker = mk('circle', { class: 'decision-marker', cx: x(epoch), cy: y(losses[epoch]), r: 6,
+      fill: statusColor[entry.decision] || 'var(--text-muted)' });
+    const title = mk('title', {});
+    title.textContent = `Epoch ${epoch}: ${decisionLabel(entry.decision)} (score ${entry.gate_score.toFixed(1)})`;
+    marker.appendChild(title);
+    svgEl.appendChild(marker);
+  });
+
+  const hoverLine = mk('line', { class: 'hover-crosshair', x1: 0, y1: padT, x2: 0, y2: padT + plotH });
+  const hoverDot = mk('circle', { class: 'hover-dot', r: 4 });
+  svgEl.appendChild(hoverLine); svgEl.appendChild(hoverDot);
+  const tooltip = document.getElementById('tooltip');
+  const overlay = mk('rect', { x: padL, y: padT, width: plotW, height: plotH, fill: 'transparent' });
+  overlay.addEventListener('mousemove', (evt) => {
+    const rect = svgEl.getBoundingClientRect();
+    const relX = ((evt.clientX - rect.left) / rect.width) * W;
+    const epoch = Math.max(0, Math.min(losses.length - 1, Math.round(((relX - padL) / plotW) * denom)));
+    const px = x(epoch), py = y(losses[epoch]);
+    hoverLine.setAttribute('x1', px); hoverLine.setAttribute('x2', px); hoverLine.style.opacity = 1;
+    hoverDot.setAttribute('cx', px); hoverDot.setAttribute('cy', py); hoverDot.style.opacity = 1;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${evt.clientX + 14}px`; tooltip.style.top = `${evt.clientY + 14}px`;
+    tooltip.innerHTML = `<div class="t-row"><span class="t-label">Epoch</span><strong>${epoch}</strong></div>
+      <div class="t-row"><span class="t-label">Loss</span><strong>${losses[epoch].toFixed(4)}</strong></div>`;
+  });
+  overlay.addEventListener('mouseleave', () => { hoverLine.style.opacity = 0; hoverDot.style.opacity = 0; tooltip.style.display = 'none'; });
+  svgEl.appendChild(overlay);
+}
+
+function renderAuditRow(entry, epochIndex) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${epochIndex}</td>
+    <td><span class="badge ${entry.decision}"><span class="dot"></span>${decisionLabel(entry.decision)}</span></td>
+    <td>${entry.gate_score.toFixed(1)}</td>
+    <td>${entry.outcome}</td>
+    <td class="formula-cell">${entry.gate_formula}</td>
+    <td class="rationale-cell">${entry.llm_proposal}: ${entry.llm_rationale}</td>`;
+  return tr;
+}
+
+/* ================= MOCK VIEW ================= */
+async function loadGateFormula() {
+  try {
+    const res = await fetch(`${API_BASE}/api/gate`);
+    document.getElementById('gate-formula').textContent = (await res.json()).formula;
+  } catch (e) {
+    document.getElementById('gate-formula').textContent = 'Could not load gate formula — is the backend running?';
+  }
+}
+
+function renderMockStats(run) {
+  document.getElementById('stat-phase').textContent = run.phase;
+  document.getElementById('stat-epoch').textContent = `${run.final_epoch} / ${run.total_epochs}`;
+  document.getElementById('stat-gpu').textContent = `${run.gpu_hours_used.toFixed(1)} / ${run.gpu_hours_budget.toFixed(1)} hrs`;
+  const last = run.audit_log[run.audit_log.length - 1];
+  document.getElementById('stat-decision').innerHTML = last
+    ? `<span class="badge ${last.decision}"><span class="dot"></span>${decisionLabel(last.decision)}</span>` : '—';
+}
+
+function renderMockTable(run) {
+  const body = document.getElementById('audit-body');
+  const empty = document.getElementById('audit-empty');
+  body.innerHTML = '';
+  if (!run.audit_log.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  run.audit_log.forEach((entry) => body.appendChild(renderAuditRow(entry, entry.epoch_index)));
+}
+
+async function runPipeline(evt) {
+  evt.preventDefault();
+  showError('');
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true; btn.textContent = 'Running…';
+
+  const form = new FormData(evt.target);
+  const plateauEnabled = document.getElementById('synthetic-plateau').checked;
+  const payload = {
+    job_name: form.get('job_name'), epochs: parseInt(form.get('epochs'), 10),
+    check_every: parseInt(form.get('check_every'), 10), seed: parseInt(form.get('seed'), 10),
+    plateau_at_epoch: plateauEnabled ? parseInt(form.get('plateau_at_epoch'), 10) : null,
+    synthetic: true,
+  };
+  try {
+    const res = await fetch(`${API_BASE}/api/runs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+    const run = await res.json();
+    renderMockStats(run);
+    drawChart(document.getElementById('chart'), run.loss_history, run.audit_log, (e) => e.epoch_index);
+    renderMockTable(run);
+  } catch (e) {
+    showError(`Run failed: ${e.message}. Is the backend running? See dashboard/README.md.`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Run pipeline';
+  }
+}
+document.getElementById('run-form').addEventListener('submit', runPipeline);
+document.getElementById('synthetic-plateau').addEventListener('change', (e) => {
+  document.querySelector('#run-form input[name="plateau_at_epoch"]').disabled = !e.target.checked;
+});
+loadGateFormula();
+
+/* ================= LIVE VIEW ================= */
+let liveWs = null;
+let liveState = { losses: [], decisions: [] };
+
+function fmtPercent(v) { return v == null ? '—' : `${v.toFixed(0)}%`; }
+
+function renderLiveHardware(sample) {
+  if (!sample) return;
+  document.getElementById('live-stat-cpu').textContent = fmtPercent(sample.cpu_percent);
+  document.getElementById('live-stat-cpu-bar').style.width = `${Math.min(100, sample.cpu_percent)}%`;
+  document.getElementById('live-stat-mem').textContent = fmtPercent(sample.memory_percent);
+  document.getElementById('live-stat-mem-bar').style.width = `${Math.min(100, sample.memory_percent)}%`;
+
+  const gpuTile = document.getElementById('live-stat-gpu-tile');
+  const gpuVal = document.getElementById('live-stat-gpu');
+  const gpuBar = document.getElementById('live-stat-gpu-bar');
+  if (sample.gpu_available && sample.gpus.length) {
+    gpuTile.classList.remove('gpu-off');
+    const g = sample.gpus[0];
+    gpuVal.textContent = `${g.utilization_percent.toFixed(0)}% (${g.name})`;
+    gpuBar.style.width = `${Math.min(100, g.utilization_percent)}%`;
+  } else {
+    gpuTile.classList.add('gpu-off');
+    gpuVal.textContent = 'No GPU detected';
+    gpuBar.style.width = '0%';
+  }
+}
+
+function renderLivePhase(phase) {
+  const el = document.getElementById('live-stat-phase');
+  const cls = phase === 'Running' || phase === 'starting' ? 'running' : 'idle';
+  const label = { idle: 'Idle', starting: 'Starting', Running: 'Running', Completed: 'Completed', Stopped: 'Stopped' }[phase] || phase;
+  el.innerHTML = `<span class="badge ${cls}"><span class="dot"></span>${label}</span>`;
+}
+
+function appendLogLine(entry) {
+  const panel = document.getElementById('live-log');
+  const div = document.createElement('div');
+  div.className = `log-line ${entry.level || 'info'}`;
+  const time = new Date(entry.ts * 1000).toLocaleTimeString();
+  div.innerHTML = `<span class="ts">${time}</span>${entry.message}`;
+  panel.appendChild(div);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function redrawLiveChart() {
+  drawChart(document.getElementById('live-chart'), liveState.losses, liveState.decisions, (e) => e.epoch_index);
+}
+
+function renderLiveTable() {
+  const body = document.getElementById('live-audit-body');
+  const empty = document.getElementById('live-audit-empty');
+  body.innerHTML = '';
+  if (!liveState.decisions.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  liveState.decisions.forEach((entry) => body.appendChild(renderAuditRow(entry, entry.epoch_index)));
+}
+
+function applySnapshot(snap) {
+  liveState.losses = snap.loss_history || [];
+  liveState.decisions = snap.decisions || [];
+  document.getElementById('live-log').innerHTML = '';
+  (snap.events || []).forEach(appendLogLine);
+  renderLivePhase(snap.phase);
+  document.getElementById('live-stat-epoch').textContent = liveState.losses.length || '—';
+  if (snap.last_hardware) renderLiveHardware(snap.last_hardware);
+  redrawLiveChart();
+  renderLiveTable();
+  const last = liveState.decisions[liveState.decisions.length - 1];
+  document.getElementById('live-stat-decision').innerHTML = last
+    ? `<span class="badge ${last.decision}"><span class="dot"></span>${decisionLabel(last.decision)}</span>` : '—';
+  document.getElementById('live-chart-hint').textContent = liveState.losses.length ? 'Streaming' : 'Waiting for a run…';
+
+  const running = snap.phase === 'Running' || snap.phase === 'starting';
+  document.getElementById('live-start-btn').disabled = running;
+  document.getElementById('live-stop-btn').disabled = !running;
+}
+
+function connectLiveSocket() {
+  liveWs = new WebSocket(`${WS_BASE}/api/live/stream`);
+  liveWs.onmessage = (evt) => {
+    const msg = JSON.parse(evt.data);
+    if (msg.type === 'snapshot') {
+      applySnapshot(msg.data);
+    } else if (msg.type === 'hardware') {
+      renderLiveHardware(msg.data);
+    } else if (msg.type === 'metric') {
+      liveState.losses.push(msg.data.loss);
+      document.getElementById('live-stat-epoch').textContent = msg.data.epoch;
+      document.getElementById('live-chart-hint').textContent = 'Streaming';
+      redrawLiveChart();
+    } else if (msg.type === 'decision') {
+      liveState.decisions.push(msg.data);
+      document.getElementById('live-stat-decision').innerHTML =
+        `<span class="badge ${msg.data.decision}"><span class="dot"></span>${decisionLabel(msg.data.decision)}</span>`;
+      redrawLiveChart();
+      renderLiveTable();
+    } else if (msg.type === 'event') {
+      appendLogLine(msg.data);
+    } else if (msg.type === 'done') {
+      renderLivePhase(msg.data.phase);
+      document.getElementById('live-start-btn').disabled = false;
+      document.getElementById('live-stop-btn').disabled = true;
+    }
+  };
+  liveWs.onclose = () => { setTimeout(connectLiveSocket, 2000); };
+  liveWs.onerror = () => { liveWs.close(); };
+}
+connectLiveSocket();
+
+document.getElementById('live-form').addEventListener('submit', async (evt) => {
+  evt.preventDefault();
+  showError('');
+  const form = new FormData(evt.target);
+  const payload = {
+    job_name: form.get('job_name'), epochs: parseInt(form.get('epochs'), 10),
+    check_every: parseInt(form.get('check_every'), 10), lr: parseFloat(form.get('lr')),
+    batch_size: parseInt(form.get('batch_size'), 10), subset_size: parseInt(form.get('subset_size'), 10),
+  };
+  document.getElementById('live-start-btn').disabled = true;
+  document.getElementById('live-stop-btn').disabled = false;
+  try {
+    const res = await fetch(`${API_BASE}/api/live/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+  } catch (e) {
+    showError(`Could not start live run: ${e.message}. Is the backend running? See dashboard/README.md.`);
+    document.getElementById('live-start-btn').disabled = false;
+    document.getElementById('live-stop-btn').disabled = true;
+  }
+});
+
+document.getElementById('live-stop-btn').addEventListener('click', async () => {
+  try { await fetch(`${API_BASE}/api/live/stop`, { method: 'POST' }); }
+  catch (e) { showError(`Could not stop run: ${e.message}`); }
+});
+</script>
+</body>
+</html>

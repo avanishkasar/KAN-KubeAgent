@@ -25,6 +25,38 @@
 
 ---
 
+## Week 2 — 27–28 September 2026
+
+### Goal: Resolve direction conflict, pivot repo away from security framing
+
+**Context:** The repo as originally set up (Week 1) was framed entirely around
+Kubernetes security/RBAC remediation (K-RAD dataset, CIS Benchmark, MITRE
+ATT&CK, security-engineer sign-off). This conflicts with the project's own
+"no cybersecurity" hard constraint and was never reconciled before Week 1's
+docs were written.
+
+**Resolved:** Pivoted to **Fine-Tuning Job Optimizer on Kubeflow** — agents
+watch a live Kubeflow `TrainJob`'s loss curve; a KAN gate decides
+continue/adjust-LR/early-stop and outputs a symbolic formula for every
+decision. Chosen over the alternative (Smart GPU Traffic Cop routing) for
+lower build risk and direct alignment with the LFS147 (Kubeflow) cert.
+
+**Completed ✅:**
+- [x] README.md, research_gap.md, methodology_draft.md, LEARNING_GUIDE.md,
+      datasets/README.md all rewritten for the new direction
+- [x] Contributors confirmed: Avanish Kasar (lead), Rupali Biradar, Viverun
+- [x] Tech choices locked: Anthropic API for agents, Minikube for local cluster,
+      real Kubeflow `TrainJob` training runs as the primary data source with
+      a synthetic loss-curve generator kept behind a toggle for testing
+- [x] No fixed submission deadline yet — build sequenced by dependency
+
+**Next:**
+- [ ] Build the KAN gate module standalone (pykan) and test on synthetic curves
+- [ ] Install Kubeflow Trainer on Minikube, submit a real small TrainJob
+- [ ] Build the LangGraph agent layer and wire it to the KAN gate
+
+---
+
 ## Week 1 — 12–14 August 2026
 
 ### Goal: Project setup + foundation certifications

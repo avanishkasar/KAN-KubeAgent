@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# KAN checkpoints - regenerate via `python -m kan_gate.train`, don't commit
+kan_gate/checkpoints/
+model/
+*.ckpt
+
+# Real training run logs/decision points (may be large / machine-specific)
+kan_gate/data/real_runs/
+
+# Dashboard build output
+dashboard/node_modules/
+dashboard/dist/
+dashboard/build/

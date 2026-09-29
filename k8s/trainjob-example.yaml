@@ -1,0 +1,28 @@
+# Example TrainJob: small CNN fine-tune on a Fashion-MNIST subset.
+# CPU-only, a few minutes per run - see k8s/README.md and
+# training/fashion_mnist_cnn.py.
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: fashion-mnist-demo
+  labels:
+    app: kan-kubeagent
+spec:
+  runtimeRef:
+    name: torch-distributed  # ships with the Kubeflow Trainer install
+  trainer:
+    image: python:3.11-slim
+    numNodes: 1
+    command:
+      - bash
+      - -c
+      - |
+        pip install --quiet torch torchvision
+        python /workspace/training/fashion_mnist_cnn.py --epochs 30 --lr 2e-4
+    resourcesPerNode:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"

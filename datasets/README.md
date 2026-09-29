@@ -2,103 +2,97 @@
 
 ## Overview
 
-This project requires two types of data:
-1. **Training data for KAN** — labeled K8s action risk scores
-2. **Agent evaluation data** — realistic K8s cluster scenarios for end-to-end testing
+This project needs two kinds of data:
+1. **Decision-point data to train the KAN gate** — labeled continue/adjust-LR/early-stop points from training runs
+2. **Agent evaluation data** — realistic `TrainJob` scenarios for end-to-end testing
 
 ---
 
-## Dataset 1: K-RAD (K8s Risk Action Dataset) — To Be Created
+## Primary Source: Real Training Runs (Fashion-MNIST)
 
-**Status:** Will be synthesised as part of this research
+**Status:** Generated automatically every time a real run happens - either
+the dashboard's Live mode (`dashboard/backend/live.py`, backed by a real
+local subprocess) or a real Kubeflow `TrainJob` on Minikube once
+`agents/kubeflow_client.py` is validated against a live cluster.
 
 ### Generation Method
 
+No separate extraction step to run manually - `kan_gate/real_run_logger.py`
+saves every real run's decision points (the 5 features + the KAN gate's
+decision at each check-in) the moment the run ends, whether it completes
+naturally or you hit Stop:
+
 ```bash
-# Step 1: Spin up a local cluster
-minikube start --nodes=3 --kubernetes-version=v1.30.0
+# 1. Start the dashboard and run one or more real training sessions from
+#    the Live tab (see dashboard/README.md) - each ending run writes a file to:
+ls kan_gate/data/real_runs/
+#   e.g. live-finetune-01_1790659331.json
 
-# Step 2: Enable audit logging
-# Add to kube-apiserver config:
-# --audit-log-path=/var/log/k8s-audit.log
-# --audit-policy-file=audit-policy.yaml
-# --audit-log-maxage=30
-
-# Step 3: Run attack simulation scripts
-python scripts/simulate_benign_traffic.py
-python scripts/simulate_attack_scenarios.py
-
-# Step 4: Label with risk scores
-python scripts/label_with_cis_benchmark.py
+# 2. Once you have a handful of runs accumulated, retrain the gate on them
+#    (this is the DEFAULT mode - no --synthetic flag):
+python -m kan_gate.train --real-data-dir kan_gate/data/real_runs
 ```
 
-### Risk Score Mapping
+`training/fashion_mnist_cnn.py` has no synthetic-data fallback by design:
+if Fashion-MNIST can't be downloaded, the run fails loudly instead of
+silently substituting fake data, so every decision point saved here came
+from a genuine training run.
 
-| K8s Action | CIS Control | MITRE Technique | Risk Score |
-|-----------|-------------|-----------------|-----------|
-| GET pods | N/A | Discovery (TA0007) | 95 (safe) |
-| PATCH deployment (replicas) | 5.2.1 | Impact | 70 |
-| CREATE ClusterRoleBinding (admin) | 5.1.1 | Privilege Escalation | 10 |
-| DELETE NetworkPolicy | 5.3.2 | Defense Evasion | 5 (critical) |
-| EXEC into pod | 5.4.1 | Execution | 15 |
-| PATCH configmap | N/A | N/A | 80 |
-| DELETE secret | 5.4.1 | Credential Access | 8 |
-| CREATE privileged pod | 5.2.1 | Privilege Escalation | 5 |
+### Feature → Label Schema
 
----
+| Feature | Description |
+|---------|-------------|
+| `loss_plateau_score` | 0-1: how flat the loss has been over the last K epochs |
+| `gradient_trend` | direction/magnitude of recent gradient norm change |
+| `lr_decay_benefit` | estimated improvement from halving LR now |
+| `gpu_hours_remaining_vs_budget` | 0-1: fraction of GPU-hour budget left |
+| `epochs_since_improvement` | normalised epochs since best validation loss |
 
-## Dataset 2: CICIDS2017 (Public — Network Intrusion)
-
-**Status:** Publicly available, use for KAN pre-training
-
-**URL:** https://www.unb.ca/cic/datasets/ids-2017.html
-
-**Why use this:**
-- Well-established benchmark for intrusion detection
-- Provides initial KAN training before K8s-specific fine-tuning
-- Allows comparison with KAN-MID paper results
-
-**Relevant attack types:**
-- DoS/DDoS → maps to K8s resource exhaustion
-- PortScan → maps to K8s cluster reconnaissance
-- Web Attacks → maps to K8s API server probing
+| Label | Meaning |
+|-------|---------|
+| `continue` | keep training as-is |
+| `adjust_lr` | reduce learning rate |
+| `early_stop` | stop and free the GPU |
 
 ---
 
-## Dataset 3: UNSW-NB15 (Public — Network Traffic)
+## Secondary Source: Synthetic Loss-Curve Generator (toggle, not default)
 
-**URL:** https://research.unsw.edu.au/projects/unsw-nb15-dataset
+**Status:** Implemented as a debugging/testing aid (`kan_gate/synthetic.py`), gated behind a `--synthetic` flag on `kan_gate/train.py` and behind the dashboard's separate Mock/Synthetic tab (`dashboard/frontend/index.html`) - the Live tab and its real training runs never touch this.
 
-**Why use this:** Secondary benchmark, used in KAN security papers
+- Generates curves as exponential decay + Gaussian noise, with an option to inject a plateau at a chosen epoch
+- Used for fast KAN-gate unit testing before real training infra is available, and for reproducing specific edge cases on demand
+- Never used as the primary training signal for the KAN gate — see `research/proposal/methodology_draft.md` Section 6
+
+```bash
+python -m kan_gate.train --synthetic --steps 250
+```
 
 ---
 
-## Dataset 4: Kubernetes Audit Log Samples (Public GitHub)
+## Reference Baselines (Public — for comparison, not KAN training)
 
-Several repositories contain real anonymised K8s audit logs:
-- `falcosecurity/falco` — contains sample audit events
-- `kubernetes/kubernetes` — test fixtures with realistic audit log formats
-- `open-policy-agent/gatekeeper` — policy violation audit samples
+Used only to compare KAN-gated decisions against, per `research/proposal/research_gap.md` Section 4:
+
+| Baseline | Where to get it |
+|----------|-------------------|
+| Hyperband | [Ray Tune](https://docs.ray.io/en/latest/tune/index.html) implementation |
+| ASHA | [Ray Tune](https://docs.ray.io/en/latest/tune/index.html) implementation |
 
 ---
 
 ## Feature Extraction Schema
 
 ```python
-# Feature vector for each K8s API event
 FEATURE_SCHEMA = {
-    "namespace_risk_score": float,    # 0.0 (dev) - 1.0 (prod)
-    "blast_radius": float,            # 0.0 - 1.0 (normalised downstream impact)
-    "change_frequency": float,        # events/hour for this resource (normalised)
-    "actor_privilege_level": float,   # 0.0 (viewer) - 1.0 (cluster-admin)
-    "resource_criticality": float,    # 0.0 (configmap) - 1.0 (secret/clusterrole)
-    "action_verb_risk": float,        # GET=0.1, LIST=0.1, CREATE=0.5, PATCH=0.6, DELETE=0.9
-    "historical_failure_rate": float, # failures/total for this action type (0-1)
-    "time_since_last_deploy": float   # hours (normalised, 0=just deployed, 1=stable)
+    "loss_plateau_score": float,            # 0.0 - 1.0
+    "gradient_trend": float,                 # normalised gradient-norm slope
+    "lr_decay_benefit": float,               # 0.0 - 1.0
+    "gpu_hours_remaining_vs_budget": float,  # 0.0 - 1.0
+    "epochs_since_improvement": float        # normalised
 }
 
-# Label
 LABEL_SCHEMA = {
-    "trust_score": float              # 0 (critical risk) - 100 (completely safe)
+    "decision": str  # "continue" | "adjust_lr" | "early_stop"
 }
 ```
