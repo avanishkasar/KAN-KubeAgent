@@ -1,13 +1,13 @@
 # k8s/ — Minikube + Kubeflow Trainer Setup
 
 Run this on your own machine (or the college GPU box, as a bonus — not a
-requirement). This could not be run inside the Claude Code cloud sandbox
+requirement). This could not be run inside the restricted cloud sandbox
 used to build this repo: that sandbox's network policy blocks
 `registry.k8s.io`, the registry Minikube pulls its own control-plane images
 from, so `minikube start` fails there with a 403 before it ever reaches the
 code in this repo. That's an environment restriction, not a bug in these
-scripts - on a normal machine (or a Claude Code environment with broader
-network access) this should just work.
+scripts - on a normal machine with broader network access this should
+just work.
 
 ## 1. Install prerequisites
 

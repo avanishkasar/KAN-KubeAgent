@@ -24,7 +24,7 @@ python -m kan_gate.train --synthetic --steps 250
 python -m agents.run_loop --epochs 30 --plateau-at-epoch 12 --check-every 5
 ```
 
-Set `ANTHROPIC_API_KEY` to use real Claude reasoning for the Supervisor's
+Set `ANTHROPIC_API_KEY` to use real LLM reasoning for the Supervisor's
 proposal; without it, `agents/llm.py` falls back to the same rule-based
 reference policy used to label the gate's training data (clearly marked
 `[heuristic fallback]` in the audit log) so the loop still runs end-to-end

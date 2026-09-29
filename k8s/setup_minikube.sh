@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start Minikube and install Kubeflow Trainer (TrainJob CRDs).
 # See k8s/README.md for prerequisites and why this can't run in the
-# Claude Code cloud sandbox this repo was built in.
+# restricted cloud sandbox this repo was built in.
 set -euo pipefail
 
 CPUS="${MINIKUBE_CPUS:-4}"
