@@ -16,3 +16,8 @@ kan_gate/data/real_runs/
 dashboard/node_modules/
 dashboard/dist/
 dashboard/build/
+
+# start.sh / start.ps1 runtime artifacts (background server log + pid)
+dashboard.log
+dashboard.log.err
+dashboard.pid

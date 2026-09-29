@@ -18,17 +18,53 @@ slider at the top of the page:
 
 ## Running it
 
+The fastest way to get everything up and running is the one-command
+startup script at the repo root - it creates a virtualenv if needed,
+installs dependencies, trains the gate checkpoint if it's missing, and
+launches the server **detached**, so it keeps training in the background
+even after you close the terminal or the browser tab:
+
+```bash
+./start.sh          # Linux / DGX
+```
+
+```powershell
+.\start.ps1          # Windows
+```
+
+Then open http://localhost:8000 any time — the browser is only a live
+viewer, not required for training to keep running. To stop the server:
+`kill $(cat dashboard.pid)` (Linux) or `Stop-Process -Id (Get-Content dashboard.pid)` (Windows).
+
+To run it manually instead:
+
 ```bash
 pip install -r dashboard/backend/requirements.txt -r agents/requirements.txt -r training/requirements.txt
 python -m kan_gate.train --synthetic --steps 250   # produces the checkpoint the dashboard loads
 uvicorn dashboard.backend.app:app --reload --port 8000
 ```
 
-Open http://localhost:8000 — the backend serves the frontend directly, no
-separate dev server needed. It defaults to the **Live** tab: fill in the
-form (job name, epoch count, learning rate, batch size, how many images to
-train on, how often the agent loop checks in) and click "Start real
-training." Switch to **Mock / Synthetic** for the instant-run mode.
+It defaults to the **Live** tab: fill in the form (job name, epoch count,
+learning rate, batch size, how many images to train on, how often the
+agent loop checks in), pick a **mode**, and click "Start real training."
+Switch to **Mock / Synthetic** for the instant-run mode.
+
+### Modes and auto-continuous
+
+- **Background** — lowers the training subprocess's OS scheduling
+  priority (`agents/process_priority.py`) so your foreground apps get the
+  CPU first; training gets whatever's left and automatically gets more
+  when the machine is idle. Use this to let the system train while you
+  use the PC normally.
+- **Normal** — default OS priority, no throughput tuning.
+- **Turbo** — raises DataLoader worker count and enables mixed-precision
+  training for maximum throughput on a CUDA GPU. GPU compute itself has
+  no OS-level "nice" (the NVIDIA driver time-slices on its own), so
+  turbo's speedup comes from these training-side settings, not priority.
+- **Auto-continuous** — when checked, the moment one real run completes
+  the dashboard immediately starts a fresh one (new job name/seed)
+  instead of stopping, so the system keeps training and harvesting real
+  decision points indefinitely. Click Stop to end it.
 
 **Live mode needs real internet access** to download Fashion-MNIST the
 first time (cached under `/tmp/data` after that) - there is no

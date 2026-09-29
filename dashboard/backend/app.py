@@ -108,6 +108,8 @@ class LiveStartRequest(BaseModel):
     lr: float = 2e-4
     batch_size: int = 128
     subset_size: int = 6000
+    mode: str = "normal"  # background | normal | turbo - see agents/process_priority.py
+    auto: bool = False  # auto-continuous: keep starting fresh real runs after each completes
 
 
 @app.post("/api/live/start")
@@ -115,6 +117,7 @@ async def live_start(req: LiveStartRequest):
     await live_session.start(
         job_name=req.job_name, epochs=req.epochs, check_every=req.check_every,
         lr=req.lr, batch_size=req.batch_size, subset_size=req.subset_size,
+        mode=req.mode, auto=req.auto,
     )
     return {"status": "started", "job_name": req.job_name}
 

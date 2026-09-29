@@ -93,6 +93,12 @@ def main():
                          help="Keep this small - the point is a real but fast CPU run.")
     parser.add_argument("--data-root", default="/tmp/data",
                          help="Where Fashion-MNIST is cached/downloaded to.")
+    parser.add_argument("--workers", type=int, default=2,
+                         help="DataLoader worker processes. 0 for background mode "
+                              "(avoid extra processes competing for CPU), higher for turbo.")
+    parser.add_argument("--amp", action="store_true",
+                         help="Mixed-precision training (turbo mode) - faster on a CUDA GPU, "
+                              "no effect on CPU.")
     args = parser.parse_args()
 
     try:
@@ -140,13 +146,20 @@ def main():
         )
         raise
 
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,
+                         num_workers=args.workers, persistent_workers=args.workers > 0)
 
     model = SmallCNN().to(device)
     lr = args.lr
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    log_event(f"Starting training: {args.epochs} epochs, batch_size={args.batch_size}, initial_lr={lr}")
+    use_amp = args.amp and device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+    if args.amp and not use_amp:
+        log_event("--amp requested but no CUDA device available - training at normal precision")
+
+    log_event(f"Starting training: {args.epochs} epochs, batch_size={args.batch_size}, "
+              f"initial_lr={lr}, workers={args.workers}, amp={use_amp}")
 
     for epoch in range(1, args.epochs + 1):
         new_lr = read_lr_override(lr)
@@ -162,11 +175,13 @@ def main():
         for images, labels in loader:
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
-            output = model(images)
-            loss = F.cross_entropy(output, labels)
-            loss.backward()
+            with torch.amp.autocast("cuda", enabled=use_amp):
+                output = model(images)
+                loss = F.cross_entropy(output, labels)
+            scaler.scale(loss).backward()
             grad_norm = sum(p.grad.norm().item() for p in model.parameters() if p.grad is not None)
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
 
             total_loss += loss.item()
             total_grad_norm += grad_norm

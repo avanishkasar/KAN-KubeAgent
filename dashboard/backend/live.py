@@ -40,6 +40,14 @@ class LiveSession:
         self.connections: list[WebSocket] = []
         self.task: asyncio.Task | None = None
         self.running = False
+        self.auto = False
+        self.mode = "normal"
+        self._run_epochs = 30
+        self._run_lr = 2e-4
+        self._run_batch_size = 128
+        self._run_subset_size = 6000
+        self._run_seed = 0
+        self._run_decisions_start = 0
 
         # Rolling snapshot so a client that connects mid-run (or
         # reconnects) can catch up instead of seeing a blank page.
@@ -79,13 +87,22 @@ class LiveSession:
             return KANGate()
 
     async def start(self, job_name: str, epochs: int, check_every: int, lr: float,
-                     batch_size: int, subset_size: int) -> None:
+                     batch_size: int, subset_size: int, mode: str = "normal",
+                     auto: bool = False) -> None:
         if self.running:
             await self.stop()
 
         self.client = LocalProcessTrainJobClient()
         self.job_name = job_name
         self.check_every = check_every
+        self.mode = mode
+        self.auto = auto
+        self._run_epochs = epochs
+        self._run_lr = lr
+        self._run_batch_size = batch_size
+        self._run_subset_size = subset_size
+        self._run_seed = 0
+        self._run_decisions_start = 0
         self.gate = self.load_gate()
         self.graph = build_graph(self.client, self.gate)
         self.agent_state = {"trainjob_name": job_name, "audit_log": []}
@@ -96,17 +113,30 @@ class LiveSession:
         self.running = True
 
         await self.broadcast({"type": "snapshot", "data": self.snapshot})
+
+        hw = await asyncio.to_thread(hardware.sample)
+        if hw["gpu_available"]:
+            gpu_names = ", ".join(g["name"] for g in hw["gpus"])
+            gpu_report = f"GPU detected: {gpu_names}"
+        else:
+            gpu_report = "No GPU detected (nvidia-smi not found) - training will run on CPU"
+        await self.emit_event(
+            f"Hardware check: {hw['cpu_count']} CPU cores, {gpu_report}. "
+            f"Mode: {mode}{' (auto-continuous)' if auto else ''}"
+        )
+
         await self.emit_event(
             f"Launching real training subprocess for '{job_name}' "
             f"({epochs} epochs, batch_size={batch_size}, subset_size={subset_size}, lr={lr})"
         )
         await asyncio.to_thread(
             self.client.create, job_name, epochs=epochs, lr=lr,
-            batch_size=batch_size, subset_size=subset_size,
+            batch_size=batch_size, subset_size=subset_size, mode=mode,
         )
         self.task = asyncio.create_task(self._run_loop())
 
     async def stop(self) -> None:
+        self.auto = False
         if self.client and self.job_name:
             await self.emit_event(f"Stopping '{self.job_name}' (user requested)", level="warning")
             await asyncio.to_thread(self.client.stop, self.job_name)
@@ -120,7 +150,8 @@ class LiveSession:
         self.snapshot["phase"] = "Stopped"
         if self.job_name:
             saved_path = await asyncio.to_thread(
-                save_decision_points, self.job_name, self.snapshot["decisions"]
+                save_decision_points, self.job_name,
+                self.snapshot["decisions"][self._run_decisions_start:],
             )
             if saved_path:
                 await self.emit_event(
@@ -189,19 +220,48 @@ class LiveSession:
                         )
 
                 if status.phase != "Running":
-                    self.running = False
                     await self.emit_event(f"Training ended: {status.phase}",
                                            level="info" if status.phase == "Completed" else "warning")
+                    run_decisions = self.snapshot["decisions"][self._run_decisions_start:]
                     saved_path = await asyncio.to_thread(
-                        save_decision_points, job_name, self.snapshot["decisions"]
+                        save_decision_points, job_name, run_decisions
                     )
                     if saved_path:
                         await self.emit_event(
-                            f"Saved {len(self.snapshot['decisions'])} real decision points to "
+                            f"Saved {len(run_decisions)} real decision points to "
                             f"{saved_path} for gate retraining (python -m kan_gate.train)"
                         )
-                    await self.broadcast({"type": "done", "data": {"phase": status.phase}})
-                    break
+
+                    if not self.auto or status.phase != "Completed":
+                        self.running = False
+                        await self.broadcast({"type": "done", "data": {"phase": status.phase}})
+                        break
+
+                    # Auto-continuous: this run finished cleanly and the
+                    # operator asked for continuous background training, so
+                    # start a fresh real run (new seed/job name) immediately
+                    # instead of stopping - each run keeps harvesting real
+                    # decision points on its own.
+                    self._run_seed += 1
+                    job_name = f"{self.job_name}-auto{self._run_seed}"
+                    self._run_decisions_start = len(self.snapshot["decisions"])
+                    self.snapshot["loss_history"] = []
+                    self.snapshot["grad_norm_history"] = []
+                    self.snapshot["phase"] = "starting"
+                    self.agent_state = {"trainjob_name": job_name, "audit_log": []}
+                    await self.broadcast({"type": "snapshot", "data": self.snapshot})
+                    await self.emit_event(
+                        f"Auto-continuous mode: starting next real training run '{job_name}' "
+                        f"({self._run_epochs} epochs, mode={self.mode})"
+                    )
+                    await asyncio.to_thread(
+                        self.client.create, job_name, epochs=self._run_epochs, lr=self._run_lr,
+                        batch_size=self._run_batch_size, subset_size=self._run_subset_size,
+                        mode=self.mode,
+                    )
+                    last_epoch_seen = 0
+                    last_gate_epoch = 0
+                    continue
 
                 await asyncio.sleep(POLL_INTERVAL_S)
         except asyncio.CancelledError:

@@ -20,10 +20,21 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from agents.process_priority import apply_mode
 from agents.trainjob_client import TrainJobStatus
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAINING_SCRIPT = REPO_ROOT / "training" / "fashion_mnist_cnn.py"
+
+# mode -> (dataloader workers, mixed precision). Priority (OS scheduling)
+# is applied separately via agents/process_priority.py - these two only
+# affect training throughput. See agents/process_priority.py's docstring
+# for why GPU has no equivalent of "background" priority.
+_MODE_TRAINING_ARGS = {
+    "background": {"workers": 0, "amp": False},
+    "normal": {"workers": 2, "amp": False},
+    "turbo": {"workers": 4, "amp": True},
+}
 
 
 @dataclass
@@ -54,21 +65,30 @@ class LocalProcessTrainJobClient:
 
     def create(self, name: str, epochs: int = 30, lr: float = 2e-4,
                batch_size: int = 128, subset_size: int = 6000,
-               gpu_hours_budget: float = 10.0) -> TrainJobStatus:
+               gpu_hours_budget: float = 10.0, mode: str = "normal") -> TrainJobStatus:
+        if mode not in _MODE_TRAINING_ARGS:
+            raise ValueError(f"Unknown mode: {mode!r}, expected one of {tuple(_MODE_TRAINING_ARGS)}")
+        mode_args = _MODE_TRAINING_ARGS[mode]
+
         lr_override_path = Path(tempfile.gettempdir()) / f"kan-kubeagent-{name}-lr.json"
         lr_override_path.write_text(json.dumps({"lr": lr}))
 
         env = {**os.environ, "LR_OVERRIDE_FILE": str(lr_override_path), "PYTHONUNBUFFERED": "1"}
+        cmd = [sys.executable, str(TRAINING_SCRIPT),
+               "--epochs", str(epochs), "--lr", str(lr),
+               "--batch-size", str(batch_size), "--subset-size", str(subset_size),
+               "--workers", str(mode_args["workers"])]
+        if mode_args["amp"]:
+            cmd.append("--amp")
+
         process = subprocess.Popen(
-            [sys.executable, str(TRAINING_SCRIPT),
-             "--epochs", str(epochs), "--lr", str(lr),
-             "--batch-size", str(batch_size), "--subset-size", str(subset_size)],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
             cwd=str(REPO_ROOT), env=env,
         )
         job = _RunningJob(process=process, lr_override_path=lr_override_path,
                            lr=lr, total_epochs=epochs, gpu_hours_budget=gpu_hours_budget)
         self._jobs[name] = job
+        job.events.append(f"Mode: {mode} - {apply_mode(process.pid, mode)}")
 
         thread = threading.Thread(target=self._pump_output, args=(name, job), daemon=True)
         thread.start()
