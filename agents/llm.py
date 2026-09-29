@@ -1,4 +1,4 @@
-"""Claude-backed reasoning for the Supervisor agent.
+"""LLM-backed reasoning for the Supervisor agent (Anthropic API).
 
 The LLM's job is strictly to PROPOSE an action and rationale from the
 observed features - it never decides whether the action is safe/justified
@@ -42,7 +42,7 @@ def _heuristic_fallback(features: dict[str, float]) -> dict:
 
 
 def propose_action(features: dict[str, float], current_lr: float, model: str = "claude-sonnet-5") -> dict:
-    """Ask Claude to propose a control action from the current features.
+    """Ask the LLM to propose a control action from the current features.
 
     Returns {"action": str, "rationale": str, "new_lr": float | None}.
     """

@@ -4,7 +4,7 @@ Implements the same interface as agents/trainjob_client.py's
 MockTrainJobClient, so agents/graph.py does not change when swapping this
 in - see k8s/README.md for cluster setup.
 
-NOT exercised against a live cluster from the Claude Code sandbox this
+NOT exercised against a live cluster from the restricted cloud sandbox this
 repo was built in - that sandbox's network policy blocks registry.k8s.io,
 so Minikube cannot start there (see k8s/README.md). Written against the
 Kubernetes Python client's documented API and training/fashion_mnist_cnn.py's

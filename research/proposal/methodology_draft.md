@@ -241,5 +241,5 @@ training_job:
   model: small CNN (Fashion-MNIST) or small transformer fine-tune
   runs: multiple seeds + injected bad-run scenarios
 
-agent_llm: Claude API (via LangGraph)
+agent_llm: Anthropic API (via LangGraph)
 ```
