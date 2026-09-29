@@ -28,6 +28,7 @@ import argparse
 import json
 import shutil
 import sys
+import time
 
 
 def log_metric(epoch: int, loss: float, grad_norm: float, lr: float) -> None:
@@ -99,6 +100,16 @@ def main():
     parser.add_argument("--amp", action="store_true",
                          help="Mixed-precision training (turbo mode) - faster on a CUDA GPU, "
                               "no effect on CPU.")
+    parser.add_argument("--cpu-threads", type=int, default=0,
+                         help="Cap torch's intra-op thread count. 0 = torch's default (all "
+                              "cores). Background mode passes a small number so a single "
+                              "training process can't saturate every core even when nothing "
+                              "else on the machine is competing for them - OS priority alone "
+                              "doesn't help on an otherwise-idle machine.")
+    parser.add_argument("--throttle-ms", type=int, default=0,
+                         help="Sleep this many milliseconds after every batch. 0 = no "
+                              "throttle. Background mode uses a small value to trade some "
+                              "throughput for a visibly low, predictable CPU/GPU load.")
     args = parser.parse_args()
 
     try:
@@ -109,6 +120,10 @@ def main():
     except ImportError:
         print("torch not installed - `pip install -r training/requirements.txt`.", file=sys.stderr)
         raise
+
+    if args.cpu_threads > 0:
+        torch.set_num_threads(args.cpu_threads)
+        log_event(f"Capped torch CPU threads to {args.cpu_threads} (background mode)")
 
     class SmallCNN(nn.Module):
         def __init__(self):
@@ -159,7 +174,8 @@ def main():
         log_event("--amp requested but no CUDA device available - training at normal precision")
 
     log_event(f"Starting training: {args.epochs} epochs, batch_size={args.batch_size}, "
-              f"initial_lr={lr}, workers={args.workers}, amp={use_amp}")
+              f"initial_lr={lr}, workers={args.workers}, amp={use_amp}, "
+              f"cpu_threads={args.cpu_threads or 'default'}, throttle_ms={args.throttle_ms}")
 
     for epoch in range(1, args.epochs + 1):
         new_lr = read_lr_override(lr)
@@ -186,6 +202,9 @@ def main():
             total_loss += loss.item()
             total_grad_norm += grad_norm
             n_batches += 1
+
+            if args.throttle_ms > 0:
+                time.sleep(args.throttle_ms / 1000)
 
         log_metric(epoch, total_loss / n_batches, total_grad_norm / n_batches, lr)
 

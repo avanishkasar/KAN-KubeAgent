@@ -110,6 +110,7 @@ class LiveStartRequest(BaseModel):
     subset_size: int = 6000
     mode: str = "normal"  # background | normal | turbo - see agents/process_priority.py
     auto: bool = False  # auto-continuous: keep starting fresh real runs after each completes
+    gpu_index: int | None = None  # which physical GPU to pin training to, on a multi-GPU machine
 
 
 @app.post("/api/live/start")
@@ -117,7 +118,7 @@ async def live_start(req: LiveStartRequest):
     await live_session.start(
         job_name=req.job_name, epochs=req.epochs, check_every=req.check_every,
         lr=req.lr, batch_size=req.batch_size, subset_size=req.subset_size,
-        mode=req.mode, auto=req.auto,
+        mode=req.mode, auto=req.auto, gpu_index=req.gpu_index,
     )
     return {"status": "started", "job_name": req.job_name}
 

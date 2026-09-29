@@ -167,9 +167,14 @@
         <label>Subset size<input type="number" name="subset_size" value="4000" min="200" max="60000"></label>
         <label>Mode
           <select name="mode" id="live-mode-select">
-            <option value="background">Background (idle-aware, low priority)</option>
+            <option value="background">Background (low, capped usage)</option>
             <option value="normal" selected>Normal</option>
             <option value="turbo">Turbo (max CPU/GPU throughput)</option>
+          </select>
+        </label>
+        <label>GPU
+          <select name="gpu_index" id="live-gpu-select">
+            <option value="">Auto</option>
           </select>
         </label>
         <div class="toggle-row">
@@ -181,17 +186,24 @@
       </form>
       <p class="note">Runs a real local training subprocess (<code>training/fashion_mnist_cnn.py</code>) on this
         machine's real CPU/GPU — actual forward/backward passes, actual hardware load, no synthetic fallback (it
-        fails loudly if Fashion-MNIST can't be downloaded). <strong>Background</strong> lowers the OS scheduling
-        priority so it yields to whatever else you're doing on this PC; <strong>Turbo</strong> raises DataLoader
-        workers and enables mixed precision for maximum throughput. <strong>Auto-continuous</strong> keeps starting
-        a fresh real run the moment one finishes, so it keeps learning and harvesting real decision points
-        indefinitely — click Stop to end it. See <code>dashboard/README.md</code>.</p>
+        fails loudly if Fashion-MNIST can't be downloaded).</p>
+      <p class="note"><strong>Background</strong> caps the process to ~25% of your CPU cores, single-threads it, and
+        adds a small per-batch delay — a real, visible low-usage mode, not just a scheduling hint, so it stays out
+        of the way even when the machine is otherwise idle. <strong>Turbo</strong> raises DataLoader workers and
+        enables mixed precision for maximum throughput — expect high CPU/GPU usage by design in this mode.
+        <strong>Auto-continuous</strong> keeps starting a fresh real run the moment one finishes (a new loss curve
+        each time — nothing carries over between runs), so it keeps learning and harvesting real decision points
+        indefinitely; the "Auto run #" and "Epochs trained (session)" tiles below track total progress across all
+        of them. Click Stop to end it. If you have more than one GPU, pick which one to train on in the
+        <strong>GPU</strong> dropdown. See <code>dashboard/README.md</code>.</p>
     </div>
 
     <div class="panel">
       <div class="stat-row" id="live-stat-row">
         <div class="stat-tile"><div class="label">Status</div><div class="value" id="live-stat-phase"><span class="badge idle"><span class="dot"></span>Idle</span></div></div>
-        <div class="stat-tile"><div class="label">Epoch</div><div class="value" id="live-stat-epoch">—</div></div>
+        <div class="stat-tile"><div class="label">Epoch (this run)</div><div class="value" id="live-stat-epoch">—</div></div>
+        <div class="stat-tile"><div class="label">Auto run #</div><div class="value" id="live-stat-run">—</div></div>
+        <div class="stat-tile"><div class="label">Epochs trained (session)</div><div class="value" id="live-stat-total-epochs">—</div></div>
         <div class="stat-tile"><div class="label">CPU</div><div class="value" id="live-stat-cpu">—</div>
           <div class="bar-track"><div class="bar-fill" id="live-stat-cpu-bar" style="width:0%"></div></div></div>
         <div class="stat-tile"><div class="label">Memory</div><div class="value" id="live-stat-mem">—</div>
@@ -199,6 +211,20 @@
         <div class="stat-tile" id="live-stat-gpu-tile"><div class="label">GPU</div><div class="value" id="live-stat-gpu">—</div>
           <div class="bar-track"><div class="bar-fill" id="live-stat-gpu-bar" style="width:0%"></div></div></div>
         <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="live-stat-decision">—</div></div>
+      </div>
+      <div id="live-gpu-extra" style="margin-top:10px; display:none;"></div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <strong style="font-size:13px;">Real-time hardware load</strong>
+        <span style="font-size:11px; color:var(--text-muted);">CPU / Memory / GPU, sampled every ~2s</span>
+      </div>
+      <svg class="chart" id="hw-chart" viewBox="0 0 1000 160" preserveAspectRatio="none" style="height:160px;"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--series-1)"></span>CPU %</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-warning)"></span>Memory %</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--status-good)"></span>GPU %</span>
       </div>
     </div>
 
@@ -478,16 +504,75 @@ function renderLiveHardware(sample) {
   const gpuTile = document.getElementById('live-stat-gpu-tile');
   const gpuVal = document.getElementById('live-stat-gpu');
   const gpuBar = document.getElementById('live-stat-gpu-bar');
+  const extra = document.getElementById('live-gpu-extra');
   if (sample.gpu_available && sample.gpus.length) {
     gpuTile.classList.remove('gpu-off');
     const g = sample.gpus[0];
     gpuVal.textContent = `${g.utilization_percent.toFixed(0)}% (${g.name})`;
     gpuBar.style.width = `${Math.min(100, g.utilization_percent)}%`;
+    if (sample.gpus.length > 1) {
+      extra.style.display = 'block';
+      extra.innerHTML = sample.gpus.map(gpu => `
+        <div style="display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-secondary); padding:4px 0; border-bottom:1px solid var(--border);">
+          <span>GPU ${gpu.index}: ${gpu.name}</span>
+          <span>${gpu.utilization_percent.toFixed(0)}% · ${gpu.memory_used_mb.toFixed(0)}/${gpu.memory_total_mb.toFixed(0)} MB · ${gpu.temperature_c.toFixed(0)}°C</span>
+        </div>`).join('');
+    } else {
+      extra.style.display = 'none';
+    }
   } else {
     gpuTile.classList.add('gpu-off');
     gpuVal.textContent = 'No GPU detected';
     gpuBar.style.width = '0%';
+    extra.style.display = 'none';
   }
+}
+
+/* ---------- real-time hardware history chart (CPU/Mem/GPU %) ---------- */
+let hwHistory = [];  // [{cpu, mem, gpu}]
+const HW_HISTORY_MAX = 150;
+
+function pushHwSample(sample) {
+  if (!sample) return;
+  hwHistory.push({
+    cpu: sample.cpu_percent,
+    mem: sample.memory_percent,
+    gpu: sample.gpu_available && sample.gpus.length ? sample.gpus[0].utilization_percent : null,
+  });
+  if (hwHistory.length > HW_HISTORY_MAX) hwHistory = hwHistory.slice(-HW_HISTORY_MAX);
+  drawHwChart();
+}
+
+function drawHwChart() {
+  const svgEl = document.getElementById('hw-chart');
+  svgEl.innerHTML = '';
+  if (!hwHistory.length) return;
+  const W = 1000, H = 160, padL = 34, padR = 10, padT = 10, padB = 18;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const denom = Math.max(1, hwHistory.length - 1);
+  const x = (i) => padL + (i / denom) * plotW;
+  const y = (v) => padT + plotH - (Math.max(0, Math.min(100, v)) / 100) * plotH;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs) => { const el = document.createElementNS(ns, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el; };
+
+  svgEl.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT, x2: padL, y2: padT + plotH }));
+  svgEl.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT + plotH, x2: padL + plotW, y2: padT + plotH }));
+  const top = mk('text', { class: 'axis-label', x: 2, y: padT + 4 }); top.textContent = '100%';
+  const bot = mk('text', { class: 'axis-label', x: 2, y: padT + plotH }); bot.textContent = '0%';
+  svgEl.appendChild(top); svgEl.appendChild(bot);
+
+  const series = [
+    { key: 'cpu', color: 'var(--series-1)' },
+    { key: 'mem', color: 'var(--status-warning)' },
+    { key: 'gpu', color: 'var(--status-good)' },
+  ];
+  series.forEach(({ key, color }) => {
+    const pts = hwHistory.map((s, i) => ({ i, v: s[key] })).filter(p => p.v != null);
+    if (!pts.length) return;
+    const d = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${x(p.i)} ${y(p.v)}`).join(' ');
+    svgEl.appendChild(mk('path', { d, fill: 'none', stroke: color, 'stroke-width': 2 }));
+  });
 }
 
 function renderLivePhase(phase) {
@@ -527,7 +612,14 @@ function applySnapshot(snap) {
   (snap.events || []).forEach(appendLogLine);
   renderLivePhase(snap.phase);
   document.getElementById('live-stat-epoch').textContent = liveState.losses.length || '—';
+  document.getElementById('live-stat-run').textContent = snap.auto_run_count != null ? `#${snap.auto_run_count + 1}` : '—';
+  document.getElementById('live-stat-total-epochs').textContent = snap.total_epochs_trained != null ? snap.total_epochs_trained : '—';
   if (snap.last_hardware) renderLiveHardware(snap.last_hardware);
+  hwHistory = (snap.hardware_history || []).map(s => ({
+    cpu: s.cpu_percent, mem: s.memory_percent,
+    gpu: s.gpu_available && s.gpus.length ? s.gpus[0].utilization_percent : null,
+  })).slice(-HW_HISTORY_MAX);
+  drawHwChart();
   redrawLiveChart();
   renderLiveTable();
   const last = liveState.decisions[liveState.decisions.length - 1];
@@ -548,6 +640,7 @@ function connectLiveSocket() {
       applySnapshot(msg.data);
     } else if (msg.type === 'hardware') {
       renderLiveHardware(msg.data);
+      pushHwSample(msg.data);
     } else if (msg.type === 'metric') {
       liveState.losses.push(msg.data.loss);
       document.getElementById('live-stat-epoch').textContent = msg.data.epoch;
@@ -572,15 +665,34 @@ function connectLiveSocket() {
 }
 connectLiveSocket();
 
+/* ---------- populate GPU select if the machine has more than one ---------- */
+async function loadGpuOptions() {
+  try {
+    const res = await fetch(`${API_BASE}/api/hardware`);
+    const hw = await res.json();
+    if (!hw.gpu_available || hw.gpus.length < 2) return;  // "Auto" is enough for 0 or 1 GPU
+    const select = document.getElementById('live-gpu-select');
+    hw.gpus.forEach((g) => {
+      const opt = document.createElement('option');
+      opt.value = g.index;
+      opt.textContent = `[${g.index}] ${g.name}`;
+      select.appendChild(opt);
+    });
+  } catch (e) { /* dropdown just stays "Auto" if this fails */ }
+}
+loadGpuOptions();
+
 document.getElementById('live-form').addEventListener('submit', async (evt) => {
   evt.preventDefault();
   showError('');
   const form = new FormData(evt.target);
+  const gpuChoice = form.get('gpu_index');
   const payload = {
     job_name: form.get('job_name'), epochs: parseInt(form.get('epochs'), 10),
     check_every: parseInt(form.get('check_every'), 10), lr: parseFloat(form.get('lr')),
     batch_size: parseInt(form.get('batch_size'), 10), subset_size: parseInt(form.get('subset_size'), 10),
     mode: form.get('mode'), auto: document.getElementById('live-auto').checked,
+    gpu_index: gpuChoice === '' ? null : parseInt(gpuChoice, 10),
   };
   document.getElementById('live-start-btn').disabled = true;
   document.getElementById('live-stop-btn').disabled = false;

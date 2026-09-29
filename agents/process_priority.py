@@ -14,6 +14,15 @@ GPU compute has no equivalent OS-level "nice" - the NVIDIA driver
 time-slices compute between processes on its own. Turbo mode's speedup
 instead comes from training/fashion_mnist_cnn.py's --workers and --amp
 flags (more dataloader throughput, mixed precision), not from priority.
+
+Priority alone only matters when something else is *competing* for the
+same cores - on an otherwise-idle machine, "nice" won't stop training
+from showing high CPU%, because there's nothing to yield to. To actually
+keep background mode's footprint small and predictable (visible single-
+digit percentages, not "however much happens to be free"), this module
+also restricts the process to a fraction of the machine's logical cores
+via CPU affinity - a hard cap, not a suggestion, honoured directly by the
+OS scheduler on both Windows and Linux.
 """
 from __future__ import annotations
 
@@ -21,14 +30,20 @@ import psutil
 
 MODES = ("background", "normal", "turbo")
 
+# Background mode is capped to this fraction of logical cores (min 1) so
+# it can't saturate the machine even when nothing else is running.
+_BACKGROUND_CORE_FRACTION = 0.25
+
 
 def apply_mode(pid: int, mode: str) -> str:
-    """Best-effort priority adjustment. Returns a human-readable outcome
-    string for the live event log - never raises, since priority is a
-    nice-to-have, not something that should fail a training run."""
+    """Best-effort priority + core-affinity adjustment. Returns a
+    human-readable outcome string for the live event log - never raises,
+    since this is a nice-to-have, not something that should fail a
+    training run."""
     if mode not in MODES:
         raise ValueError(f"Unknown mode: {mode!r}, expected one of {MODES}")
 
+    outcomes = []
     try:
         proc = psutil.Process(pid)
         if psutil.WINDOWS:
@@ -38,6 +53,7 @@ def apply_mode(pid: int, mode: str) -> str:
                 "turbo": psutil.ABOVE_NORMAL_PRIORITY_CLASS,
             }
             proc.nice(targets[mode])
+            outcomes.append(f"priority='{mode}'")
         else:
             # Standard POSIX niceness: higher = lower priority. Raising it
             # (background) never needs privileges; lowering it (turbo)
@@ -46,14 +62,27 @@ def apply_mode(pid: int, mode: str) -> str:
             targets = {"background": 15, "normal": 0, "turbo": -5}
             try:
                 proc.nice(targets[mode])
+                outcomes.append(f"priority='{mode}'")
             except psutil.AccessDenied:
                 if mode == "turbo":
-                    return (
-                        "turbo mode requested elevated CPU priority but this process "
-                        "isn't privileged enough to grant it - training still runs, "
-                        "just at normal OS priority"
+                    outcomes.append(
+                        "priority elevation denied (not privileged enough) - running at "
+                        "normal OS priority"
                     )
-                raise
-        return f"set process priority for '{mode}' mode (pid {pid})"
+                else:
+                    raise
+
+        try:
+            total_cores = psutil.cpu_count(logical=True) or 1
+            if mode == "background":
+                capped = max(1, int(total_cores * _BACKGROUND_CORE_FRACTION))
+                proc.cpu_affinity(list(range(capped)))
+                outcomes.append(f"capped to {capped}/{total_cores} CPU cores")
+            else:
+                proc.cpu_affinity(list(range(total_cores)))
+        except (AttributeError, NotImplementedError):
+            pass  # cpu_affinity isn't available on this platform (e.g. macOS) - priority alone still applies
+
+        return f"{', '.join(outcomes)} (pid {pid})" if outcomes else f"applied '{mode}' mode (pid {pid})"
     except Exception as exc:  # pragma: no cover - best-effort, must never crash a run
-        return f"could not set process priority for '{mode}' mode ({exc.__class__.__name__}): continuing at default priority"
+        return f"could not fully apply '{mode}' mode ({exc.__class__.__name__}): continuing at default settings"

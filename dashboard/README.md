@@ -51,20 +51,39 @@ Switch to **Mock / Synthetic** for the instant-run mode.
 
 ### Modes and auto-continuous
 
-- **Background** — lowers the training subprocess's OS scheduling
-  priority (`agents/process_priority.py`) so your foreground apps get the
-  CPU first; training gets whatever's left and automatically gets more
-  when the machine is idle. Use this to let the system train while you
-  use the PC normally.
-- **Normal** — default OS priority, no throughput tuning.
+- **Background** — a real, visible low-usage mode, not just an OS
+  scheduling hint: it lowers the subprocess's OS priority
+  (`agents/process_priority.py`), restricts it to ~25% of the machine's
+  logical CPU cores via CPU affinity, caps torch to a single thread, and
+  adds a small per-batch delay. Together these keep CPU/GPU usage low and
+  predictable even when nothing else is competing for the machine - not
+  just "whatever happens to be free." Use this to let the system train
+  while you use the PC normally.
+- **Normal** — default OS priority, no throughput tuning or capping.
 - **Turbo** — raises DataLoader worker count and enables mixed-precision
-  training for maximum throughput on a CUDA GPU. GPU compute itself has
+  training for maximum throughput on a CUDA GPU. Expect high CPU/GPU
+  usage by design - that's the point of this mode. GPU compute itself has
   no OS-level "nice" (the NVIDIA driver time-slices on its own), so
   turbo's speedup comes from these training-side settings, not priority.
+- **Multiple GPUs** — the GPU dropdown next to Mode lets you pin a run to
+  one physical GPU (via `CUDA_VISIBLE_DEVICES`); it only appears once the
+  machine reports more than one. Leave it on "Auto" to let CUDA pick.
 - **Auto-continuous** — when checked, the moment one real run completes
   the dashboard immediately starts a fresh one (new job name/seed)
   instead of stopping, so the system keeps training and harvesting real
-  decision points indefinitely. Click Stop to end it.
+  decision points indefinitely. Click Stop to end it. The loss chart
+  resets each time a new run starts (nothing carries over between runs -
+  that's the honest picture), but the **Auto run #** and **Epochs
+  trained (session)** tiles keep counting across every run, so it's
+  visible from the dashboard that this is continuous rather than stuck
+  restarting. A "CPU/GPU %" real-time chart (separate from the loss
+  chart) shows hardware load over the last few minutes, independent of
+  any one run resetting.
+
+**A brief CPU/GPU spike right after clicking Start is expected**, not a
+bug: it's the subprocess starting up - importing torch, spinning up
+DataLoader worker processes, and loading the first batch of data. It
+settles within the first few seconds once training is actually running.
 
 **Live mode needs real internet access** to download Fashion-MNIST the
 first time (cached under `/tmp/data` after that) - there is no

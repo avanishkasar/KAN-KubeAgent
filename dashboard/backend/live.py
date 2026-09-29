@@ -42,6 +42,7 @@ class LiveSession:
         self.running = False
         self.auto = False
         self.mode = "normal"
+        self.gpu_index: int | None = None
         self._run_epochs = 30
         self._run_lr = 2e-4
         self._run_batch_size = 128
@@ -54,6 +55,7 @@ class LiveSession:
         self.snapshot: dict[str, Any] = {
             "phase": "idle", "job_name": None, "loss_history": [], "grad_norm_history": [],
             "decisions": [], "events": [], "hardware_history": [], "last_hardware": None,
+            "auto_run_count": 0, "total_epochs_trained": 0,
         }
 
     async def register(self, ws: WebSocket) -> None:
@@ -88,7 +90,7 @@ class LiveSession:
 
     async def start(self, job_name: str, epochs: int, check_every: int, lr: float,
                      batch_size: int, subset_size: int, mode: str = "normal",
-                     auto: bool = False) -> None:
+                     auto: bool = False, gpu_index: int | None = None) -> None:
         if self.running:
             await self.stop()
 
@@ -97,6 +99,7 @@ class LiveSession:
         self.check_every = check_every
         self.mode = mode
         self.auto = auto
+        self.gpu_index = gpu_index
         self._run_epochs = epochs
         self._run_lr = lr
         self._run_batch_size = batch_size
@@ -109,6 +112,7 @@ class LiveSession:
         self.snapshot = {
             "phase": "starting", "job_name": job_name, "loss_history": [], "grad_norm_history": [],
             "decisions": [], "events": [], "hardware_history": [], "last_hardware": None,
+            "auto_run_count": 0, "total_epochs_trained": 0,
         }
         self.running = True
 
@@ -116,8 +120,12 @@ class LiveSession:
 
         hw = await asyncio.to_thread(hardware.sample)
         if hw["gpu_available"]:
-            gpu_names = ", ".join(g["name"] for g in hw["gpus"])
-            gpu_report = f"GPU detected: {gpu_names}"
+            gpu_names = ", ".join(f"[{g['index']}] {g['name']}" for g in hw["gpus"])
+            gpu_report = f"{len(hw['gpus'])} GPU(s) detected: {gpu_names}"
+            if gpu_index is not None:
+                gpu_report += f" - training pinned to GPU {gpu_index}"
+            elif len(hw["gpus"]) > 1:
+                gpu_report += " - no GPU selected, CUDA will pick its own default"
         else:
             gpu_report = "No GPU detected (nvidia-smi not found) - training will run on CPU"
         await self.emit_event(
@@ -131,7 +139,7 @@ class LiveSession:
         )
         await asyncio.to_thread(
             self.client.create, job_name, epochs=epochs, lr=lr,
-            batch_size=batch_size, subset_size=subset_size, mode=mode,
+            batch_size=batch_size, subset_size=subset_size, mode=mode, gpu_index=gpu_index,
         )
         self.task = asyncio.create_task(self._run_loop())
 
@@ -189,6 +197,7 @@ class LiveSession:
                         }
                         self.snapshot["loss_history"].append(metric["loss"])
                         self.snapshot["grad_norm_history"].append(metric["grad_norm"])
+                        self.snapshot["total_epochs_trained"] += 1
                         await self.broadcast({"type": "metric", "data": metric})
                     last_epoch_seen = status.epoch
 
@@ -241,8 +250,14 @@ class LiveSession:
                     # operator asked for continuous background training, so
                     # start a fresh real run (new seed/job name) immediately
                     # instead of stopping - each run keeps harvesting real
-                    # decision points on its own.
+                    # decision points on its own. The chart resets per run
+                    # (a fresh loss curve each time is the honest picture -
+                    # nothing carries over model weights between runs), but
+                    # auto_run_count/total_epochs_trained keep accumulating
+                    # across the whole session so it's visible from the
+                    # dashboard that this is continuous, not stuck restarting.
                     self._run_seed += 1
+                    self.snapshot["auto_run_count"] += 1
                     job_name = f"{self.job_name}-auto{self._run_seed}"
                     self._run_decisions_start = len(self.snapshot["decisions"])
                     self.snapshot["loss_history"] = []
@@ -251,13 +266,14 @@ class LiveSession:
                     self.agent_state = {"trainjob_name": job_name, "audit_log": []}
                     await self.broadcast({"type": "snapshot", "data": self.snapshot})
                     await self.emit_event(
-                        f"Auto-continuous mode: starting next real training run '{job_name}' "
-                        f"({self._run_epochs} epochs, mode={self.mode})"
+                        f"Auto-continuous mode: starting real run #{self.snapshot['auto_run_count'] + 1} "
+                        f"'{job_name}' ({self._run_epochs} epochs, mode={self.mode}) - "
+                        f"{self.snapshot['total_epochs_trained']} epochs trained so far this session"
                     )
                     await asyncio.to_thread(
                         self.client.create, job_name, epochs=self._run_epochs, lr=self._run_lr,
                         batch_size=self._run_batch_size, subset_size=self._run_subset_size,
-                        mode=self.mode,
+                        mode=self.mode, gpu_index=self.gpu_index,
                     )
                     last_epoch_seen = 0
                     last_gate_epoch = 0

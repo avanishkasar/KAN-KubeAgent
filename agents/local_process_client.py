@@ -26,14 +26,17 @@ from agents.trainjob_client import TrainJobStatus
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAINING_SCRIPT = REPO_ROOT / "training" / "fashion_mnist_cnn.py"
 
-# mode -> (dataloader workers, mixed precision). Priority (OS scheduling)
-# is applied separately via agents/process_priority.py - these two only
-# affect training throughput. See agents/process_priority.py's docstring
-# for why GPU has no equivalent of "background" priority.
+# mode -> dataloader/training-side settings. OS scheduling priority and
+# CPU core affinity are applied separately via agents/process_priority.py;
+# cpu_threads/throttle_ms here are the training-process-internal half of
+# "background" actually being light (torch's own thread pool otherwise
+# ignores OS niceness and will use every core it can see). See
+# agents/process_priority.py's docstring for why GPU has no equivalent of
+# "background" priority.
 _MODE_TRAINING_ARGS = {
-    "background": {"workers": 0, "amp": False},
-    "normal": {"workers": 2, "amp": False},
-    "turbo": {"workers": 4, "amp": True},
+    "background": {"workers": 0, "amp": False, "cpu_threads": 1, "throttle_ms": 50},
+    "normal": {"workers": 2, "amp": False, "cpu_threads": 0, "throttle_ms": 0},
+    "turbo": {"workers": 4, "amp": True, "cpu_threads": 0, "throttle_ms": 0},
 }
 
 
@@ -65,7 +68,8 @@ class LocalProcessTrainJobClient:
 
     def create(self, name: str, epochs: int = 30, lr: float = 2e-4,
                batch_size: int = 128, subset_size: int = 6000,
-               gpu_hours_budget: float = 10.0, mode: str = "normal") -> TrainJobStatus:
+               gpu_hours_budget: float = 10.0, mode: str = "normal",
+               gpu_index: int | None = None) -> TrainJobStatus:
         if mode not in _MODE_TRAINING_ARGS:
             raise ValueError(f"Unknown mode: {mode!r}, expected one of {tuple(_MODE_TRAINING_ARGS)}")
         mode_args = _MODE_TRAINING_ARGS[mode]
@@ -74,10 +78,17 @@ class LocalProcessTrainJobClient:
         lr_override_path.write_text(json.dumps({"lr": lr}))
 
         env = {**os.environ, "LR_OVERRIDE_FILE": str(lr_override_path), "PYTHONUNBUFFERED": "1"}
+        if gpu_index is not None:
+            # Restricts which physical GPU CUDA sees for this subprocess -
+            # the real mechanism for "which GPU do I train on" when the
+            # machine has more than one.
+            env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
         cmd = [sys.executable, str(TRAINING_SCRIPT),
                "--epochs", str(epochs), "--lr", str(lr),
                "--batch-size", str(batch_size), "--subset-size", str(subset_size),
-               "--workers", str(mode_args["workers"])]
+               "--workers", str(mode_args["workers"]),
+               "--cpu-threads", str(mode_args["cpu_threads"]),
+               "--throttle-ms", str(mode_args["throttle_ms"])]
         if mode_args["amp"]:
             cmd.append("--amp")
 
