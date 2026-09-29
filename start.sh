@@ -29,7 +29,7 @@ source "$VENV_DIR/bin/activate"
 
 echo "Installing dependencies (this only downloads what's missing)..."
 pip install --quiet --upgrade pip
-pip install --quiet -r dashboard/backend/requirements.txt -r agents/requirements.txt -r training/requirements.txt
+pip install --quiet -r dashboard/backend/requirements.txt -r agents/requirements.txt -r training/requirements.txt -r kan_gate/requirements.txt
 
 if command -v nvidia-smi >/dev/null 2>&1; then
     if ! python3 -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null; then

@@ -39,7 +39,7 @@ viewer, not required for training to keep running. To stop the server:
 To run it manually instead:
 
 ```bash
-pip install -r dashboard/backend/requirements.txt -r agents/requirements.txt -r training/requirements.txt
+pip install -r dashboard/backend/requirements.txt -r agents/requirements.txt -r training/requirements.txt -r kan_gate/requirements.txt
 python -m kan_gate.train --synthetic --steps 250   # produces the checkpoint the dashboard loads
 uvicorn dashboard.backend.app:app --reload --port 8000
 ```

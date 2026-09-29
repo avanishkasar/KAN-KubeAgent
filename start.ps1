@@ -30,7 +30,7 @@ $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 
 Write-Host "Installing dependencies (this only downloads what's missing)..."
 & $VenvPython -m pip install --quiet --upgrade pip
-& $VenvPython -m pip install --quiet -r dashboard\backend\requirements.txt -r agents\requirements.txt -r training\requirements.txt
+& $VenvPython -m pip install --quiet -r dashboard\backend\requirements.txt -r agents\requirements.txt -r training\requirements.txt -r kan_gate\requirements.txt
 
 $hasNvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 if ($hasNvidiaSmi) {
