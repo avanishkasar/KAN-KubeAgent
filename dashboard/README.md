@@ -30,6 +30,13 @@ form (job name, epoch count, learning rate, batch size, how many images to
 train on, how often the agent loop checks in) and click "Start real
 training." Switch to **Mock / Synthetic** for the instant-run mode.
 
+**Live mode needs real internet access** to download Fashion-MNIST the
+first time (cached under `/tmp/data` after that) - there is no
+synthetic-data fallback if it can't reach the dataset. If a Live run fails
+immediately with a `FATAL: could not load real Fashion-MNIST` line in the
+process log, that's this: check network access, or pre-populate the
+`--data-root` directory training/fashion_mnist_cnn.py uses.
+
 ## What's actually live, and what isn't
 
 - **Loss/gradient numbers, in both modes**: Live mode reads them from the
@@ -69,6 +76,22 @@ logs a warning to the live event log if it detects this exact mismatch
 (a GPU present via `nvidia-smi`, but no CUDA support in the installed
 torch), so it's diagnosable from the dashboard itself rather than a silent
 CPU fallback.
+
+## Harvesting real runs to retrain the gate
+
+Every Live run - whether it completes naturally or you click Stop -
+automatically saves its decision points (the 5 features plus the KAN
+gate's decision at each check-in) to `kan_gate/data/real_runs/*.json` via
+`kan_gate/real_run_logger.py`. Nothing manual to run for this; it happens
+as part of ending the session. Once a handful of runs have accumulated:
+
+```bash
+python -m kan_gate.train --real-data-dir kan_gate/data/real_runs
+```
+
+retrains the gate on real curves instead of the synthetic ones the
+shipped checkpoint started from, and overwrites the checkpoint the
+dashboard loads. See `datasets/README.md` for the full picture.
 
 ## Once a real Kubernetes TrainJob is available
 

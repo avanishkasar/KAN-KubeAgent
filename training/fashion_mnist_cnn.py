@@ -14,12 +14,13 @@ Also honours a live learning-rate patch, checked once per epoch:
 - TRAINJOB_NAME env var (real cluster mode): a ConfigMap
   `{trainjob_name}-lr-override` that agents/kubeflow_client.py writes.
 
-If Fashion-MNIST can't be downloaded (no internet, or a blocked host -
-this happens in the Claude Code sandbox this repo was built in, and would
-also happen on an offline demo machine), falls back to a synthetic but
-still-learnable image dataset so the run is always real training - real
-forward/backward passes, real optimizer steps, real CPU/GPU load - never
-a canned/fake loss curve.
+Requires real Fashion-MNIST to be downloadable (internet access to
+pytorch's dataset mirror). There is no synthetic-data fallback here on
+purpose - per project policy, this script either trains on real data or
+fails loudly; it never silently substitutes fake data. If you're on a
+machine without internet access, download the dataset ahead of time to
+the `--data-root` directory (default /tmp/data) so torchvision finds it
+already cached, or run against a network with access.
 """
 from __future__ import annotations
 
@@ -68,31 +69,19 @@ def read_lr_override(default_lr: float) -> float:
         return default_lr
 
 
-def _load_dataset(subset_size: int):
-    """Real Fashion-MNIST if it can be downloaded, else a synthetic but
-    genuinely learnable fallback of the same shape (28x28 grayscale, 10
-    classes) - each class is a fixed random pattern plus noise, so a CNN
-    can actually learn to tell them apart and the loss genuinely drops."""
-    import torch
-    from torch.utils.data import DataLoader, Subset, TensorDataset
+def _load_dataset(subset_size: int, data_root: str):
+    """Real Fashion-MNIST, downloaded if not already cached at data_root.
+    No synthetic fallback: if this fails, it raises and main() logs a
+    loud, clear error before letting the process exit non-zero - per
+    project policy, a run is either real data or it doesn't run."""
+    from torch.utils.data import Subset
+    from torchvision import datasets, transforms
 
-    try:
-        from torchvision import datasets, transforms
-
-        transform = transforms.Compose([transforms.ToTensor()])
-        full_train = datasets.FashionMNIST(root="/tmp/data", train=True, download=True, transform=transform)
-        subset = Subset(full_train, range(min(subset_size, len(full_train))))
-        log_event(f"Loaded real Fashion-MNIST subset ({len(subset)} images)")
-        return subset
-    except Exception as exc:
-        log_event(f"Fashion-MNIST download unavailable ({exc.__class__.__name__}); "
-                   f"using synthetic learnable dataset instead")
-        generator = torch.Generator().manual_seed(0)
-        num_classes = 10
-        class_patterns = torch.randn(num_classes, 1, 28, 28, generator=generator)
-        labels = torch.randint(0, num_classes, (subset_size,), generator=generator)
-        images = class_patterns[labels] + 0.5 * torch.randn(subset_size, 1, 28, 28, generator=generator)
-        return TensorDataset(images, labels)
+    transform = transforms.Compose([transforms.ToTensor()])
+    full_train = datasets.FashionMNIST(root=data_root, train=True, download=True, transform=transform)
+    subset = Subset(full_train, range(min(subset_size, len(full_train))))
+    log_event(f"Loaded real Fashion-MNIST subset ({len(subset)} images) from {data_root}")
+    return subset
 
 
 def main():
@@ -102,6 +91,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--subset-size", type=int, default=6000,
                          help="Keep this small - the point is a real but fast CPU run.")
+    parser.add_argument("--data-root", default="/tmp/data",
+                         help="Where Fashion-MNIST is cached/downloaded to.")
     args = parser.parse_args()
 
     try:
@@ -139,7 +130,16 @@ def main():
             "(see training/requirements.txt)."
         )
 
-    dataset = _load_dataset(args.subset_size)
+    try:
+        dataset = _load_dataset(args.subset_size, args.data_root)
+    except Exception as exc:
+        log_event(
+            f"FATAL: could not load real Fashion-MNIST ({exc.__class__.__name__}: {exc}). "
+            f"No synthetic fallback by design - check network access to download it, or "
+            f"pre-populate --data-root ({args.data_root}) with the dataset."
+        )
+        raise
+
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
     model = SmallCNN().to(device)

@@ -8,27 +8,35 @@ This project needs two kinds of data:
 
 ---
 
-## Primary Source: Real Training Runs (Fashion-MNIST / small transformer)
+## Primary Source: Real Training Runs (Fashion-MNIST)
 
-**Status:** Generated as part of this research, from real Kubeflow `TrainJob` runs on Minikube.
+**Status:** Generated automatically every time a real run happens - either
+the dashboard's Live mode (`dashboard/backend/live.py`, backed by a real
+local subprocess) or a real Kubeflow `TrainJob` on Minikube once
+`agents/kubeflow_client.py` is validated against a live cluster.
 
 ### Generation Method
 
+No separate extraction step to run manually - `kan_gate/real_run_logger.py`
+saves every real run's decision points (the 5 features + the KAN gate's
+decision at each check-in) the moment the run ends, whether it completes
+naturally or you hit Stop:
+
 ```bash
-# Step 1: Spin up a local cluster with Kubeflow Trainer installed
-minikube start --cpus=4 --memory=8g
-kubectl apply -f https://github.com/kubeflow/trainer/releases/download/v2.x/manifests.yaml
+# 1. Start the dashboard and run one or more real training sessions from
+#    the Live tab (see dashboard/README.md) - each ending run writes a file to:
+ls kan_gate/data/real_runs/
+#   e.g. live-finetune-01_1790659331.json
 
-# Step 2: Submit real training runs (varying seed / LR schedule / injected bad runs)
-python scripts/run_trainjob.py --config configs/fashion_mnist_cnn.yaml --seed 1
-python scripts/run_trainjob.py --config configs/fashion_mnist_cnn.yaml --seed 2 --bad-run
-
-# Step 3: Extract feature/decision points from the logged loss history
-python scripts/extract_decision_points.py --job finetune-run-01
-
-# Step 4: Weak-label with the reference policy, then manually review a sample
-python scripts/label_with_reference_policy.py
+# 2. Once you have a handful of runs accumulated, retrain the gate on them
+#    (this is the DEFAULT mode - no --synthetic flag):
+python -m kan_gate.train --real-data-dir kan_gate/data/real_runs
 ```
+
+`training/fashion_mnist_cnn.py` has no synthetic-data fallback by design:
+if Fashion-MNIST can't be downloaded, the run fails loudly instead of
+silently substituting fake data, so every decision point saved here came
+from a genuine training run.
 
 ### Feature → Label Schema
 
@@ -50,14 +58,14 @@ python scripts/label_with_reference_policy.py
 
 ## Secondary Source: Synthetic Loss-Curve Generator (toggle, not default)
 
-**Status:** Implemented as a debugging/testing aid, gated behind a `--synthetic` flag.
+**Status:** Implemented as a debugging/testing aid (`kan_gate/synthetic.py`), gated behind a `--synthetic` flag on `kan_gate/train.py` and behind the dashboard's separate Mock/Synthetic tab (`dashboard/frontend/index.html`) - the Live tab and its real training runs never touch this.
 
 - Generates curves as exponential decay + Gaussian noise, with an option to inject a plateau at a chosen epoch
 - Used for fast KAN-gate unit testing before real training infra is available, and for reproducing specific edge cases on demand
 - Never used as the primary training signal for the KAN gate — see `research/proposal/methodology_draft.md` Section 6
 
 ```bash
-python scripts/generate_synthetic_curve.py --plateau-at-epoch 15 --noise 0.02
+python -m kan_gate.train --synthetic --steps 250
 ```
 
 ---

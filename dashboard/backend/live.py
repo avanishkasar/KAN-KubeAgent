@@ -23,6 +23,7 @@ from agents.graph import build_graph  # noqa: E402
 from agents.local_process_client import LocalProcessTrainJobClient  # noqa: E402
 from dashboard.backend import hardware  # noqa: E402
 from kan_gate.gate import DEFAULT_CKPT_PATH, KANGate  # noqa: E402
+from kan_gate.real_run_logger import save_decision_points  # noqa: E402
 
 HARDWARE_SAMPLE_INTERVAL_S = 2.0
 POLL_INTERVAL_S = 0.5
@@ -117,6 +118,15 @@ class LiveSession:
         # before it gets there, so send it here instead - otherwise the
         # frontend never learns the run ended and Start/Stop stay stuck.
         self.snapshot["phase"] = "Stopped"
+        if self.job_name:
+            saved_path = await asyncio.to_thread(
+                save_decision_points, self.job_name, self.snapshot["decisions"]
+            )
+            if saved_path:
+                await self.emit_event(
+                    f"Saved {len(self.snapshot['decisions'])} real decision points to "
+                    f"{saved_path} for gate retraining (python -m kan_gate.train)"
+                )
         await self.broadcast({"type": "done", "data": {"phase": "Stopped"}})
 
     async def _run_loop(self) -> None:
@@ -182,6 +192,14 @@ class LiveSession:
                     self.running = False
                     await self.emit_event(f"Training ended: {status.phase}",
                                            level="info" if status.phase == "Completed" else "warning")
+                    saved_path = await asyncio.to_thread(
+                        save_decision_points, job_name, self.snapshot["decisions"]
+                    )
+                    if saved_path:
+                        await self.emit_event(
+                            f"Saved {len(self.snapshot['decisions'])} real decision points to "
+                            f"{saved_path} for gate retraining (python -m kan_gate.train)"
+                        )
                     await self.broadcast({"type": "done", "data": {"phase": status.phase}})
                     break
 

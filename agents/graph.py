@@ -64,6 +64,7 @@ def build_graph(client: TrainJobClient, gate: KANGate):
         entry["llm_proposal"] = state["proposed_action"]
         entry["llm_rationale"] = state["proposal_rationale"]
         entry["epoch_index"] = len(state["loss_history"]) - 1
+        entry["features"] = state["features"]  # for kan_gate.real_run_logger's harvesting
         audit_log = state.get("audit_log", []) + [entry]
         return {**state, "executed": True, "audit_log": audit_log}
 
