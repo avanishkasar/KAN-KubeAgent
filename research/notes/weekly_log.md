@@ -45,7 +45,7 @@ lower build risk and direct alignment with the LFS147 (Kubeflow) cert.
 - [x] README.md, research_gap.md, methodology_draft.md, LEARNING_GUIDE.md,
       datasets/README.md all rewritten for the new direction
 - [x] Contributors confirmed: Avanish Kasar (lead), Rupali Biradar, Viverun
-- [x] Tech choices locked: Anthropic API for agents, Minikube for local cluster,
+- [x] Tech choices locked: hosted LLM API for agents, Minikube for local cluster,
       real Kubeflow `TrainJob` training runs as the primary data source with
       a synthetic loss-curve generator kept behind a toggle for testing
 - [x] No fixed submission deadline yet — build sequenced by dependency

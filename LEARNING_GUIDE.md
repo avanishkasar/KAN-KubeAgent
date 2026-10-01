@@ -421,7 +421,7 @@ def extract_features(loss_history: list, lr_schedule: dict, budget: dict) -> dic
 
 ### How the LLM agent "thinks"
 
-The LLM (an Anthropic model, in this project) acts as the brain.
+The LLM (a hosted LLM, in this project) acts as the brain.
 It receives a **prompt** describing the current training state and available tools.
 It outputs either a thought (reasoning step) or a tool call (action to take).
 
@@ -508,7 +508,7 @@ app = workflow.compile()
 
 **Resources to learn Agentic AI:**
 - [LangGraph documentation](https://langchain-ai.github.io/langgraph/)
-- [Anthropic API docs](https://docs.anthropic.com/) — tool use / agent loops
+- LangGraph documentation — agent loops and state graphs
 
 ---
 

@@ -16,6 +16,38 @@ KAN-KubeAgent sits at the intersection of three technologies:
 
 Can a Kolmogorov-Arnold Network act as a transparent, formula-producing gate inside an agentic fine-tuning controller, deciding when to continue, adjust the learning rate, or stop and reallocate a Kubeflow TrainJob, in a way a human can audit at a glance?
 
+## Getting started
+
+Requirements: Python 3.10 or newer and internet access for the first run (Fashion-MNIST is downloaded once). An NVIDIA GPU is optional.
+
+1. Clone and enter the repository:
+
+```
+git clone https://github.com/avanishkasar/KAN-KubeAgent.git
+cd KAN-KubeAgent
+```
+
+2. Start everything with one command. It creates a virtual environment, installs dependencies, trains the gate from the bundled real learning curves if no checkpoint exists, and launches the dashboard in the background:
+
+```
+.\start.ps1        # Windows (PowerShell)
+./start.sh         # Linux / macOS
+```
+
+3. Open http://localhost:8000 and click Start real training on the Live tab. Use the KAN Network tab to inspect the gate and the Research tab for the benchmark.
+
+4. Stop the server with `Stop-Process -Id (Get-Content dashboard.pid)` on Windows, or `kill $(cat dashboard.pid)` on Linux.
+
+To use a GPU, install the CUDA build of PyTorch from the index described in training/requirements.txt, then restart. To enable real LLM reasoning for the Supervisor agent, set the ANTHROPIC_API_KEY environment variable before starting; without it the Supervisor uses a rule-based fallback and the gate's decisions are unaffected.
+
+Training modes on the Live tab: Background (capped CPU, low priority, safe to use while working), Normal, and Turbo (maximum throughput). Auto-continuous keeps starting fresh runs. On a machine with several GPUs, pick the one to use from the GPU dropdown.
+
+Run the tests with `python -m pytest agents/tests kan_gate/tests`.
+
+## Results
+
+On 36 real Fashion-MNIST runs (6 learning rates, 2 batch sizes, 3 seeds, 40-epoch budget) with seed-grouped cross-validation, the hindsight-trained gate saves 31.0% of the epoch budget at 0.20% mean regret in best validation loss. The same gate trained on rule labels saves 4.4%. A hindsight oracle reaches 0.18% regret. In closed-loop control of 12 held-out live runs the system saved 37.1% of epochs with no significant change in best validation loss. A linear gate trained on the same labels performs comparably, so the KAN's contribution is an exact, readable, non-linear decision formula rather than higher accuracy. Limitations (one small model, intervention cooldown missing, Kubeflow client untested on a live cluster) are listed in the paper.
+
 ## Problem statement
 
 Fine-tuning jobs on Kubernetes today are babysat in one of two ways:
@@ -138,8 +170,8 @@ See `research/literature/` for full annotated notes.
 | 3: Environment | Minikube + Kubeflow Trainer install, run a real tiny fine-tuning job |
 | 4: Agent layer | LangGraph agents observing the real TrainJob |
 | 5: Integration | Wire agents, KAN gate, and real TrainJob control actions together |
-| 6: Dashboard | Live decision curve and formula audit log |
-| 7: Paper | Write and submit to Avishkar Research Convention |
+| 6: Dashboard | Done: live control room, KAN network view, research view |
+| 7: Paper | Draft complete (paper/); next: cluster validation and larger models |
 
 No fixed hard deadline is set yet; phases are sequenced by dependency, not calendar weeks.
 

@@ -1,4 +1,4 @@
-"""LLM-backed reasoning for the Supervisor agent (Anthropic API).
+"""LLM-backed reasoning for the Supervisor agent (hosted LLM API).
 
 The LLM's job is strictly to PROPOSE an action and rationale from the
 observed features - it never decides whether the action is safe/justified
