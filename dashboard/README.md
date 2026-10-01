@@ -1,7 +1,16 @@
 # dashboard/ — Live Decision Dashboard
 
-A FastAPI backend plus a static frontend with two modes, switched with the
-slider at the top of the page:
+A FastAPI backend plus a static frontend with four views, switched with the
+tabs at the top of the page:
+
+- **KAN Network** — the gate's real structure from `/api/gate/network`: every
+  edge drawn with the function it learned, edge width by learned importance,
+  color by the sign of its value for the current input. Sliders send any
+  feature vector to `/api/gate/explain`; a waterfall shows the baseline plus
+  each feature's exact contribution to the score. "Replay a past decision"
+  loads any live decision's features.
+- **Research** — the offline benchmark results from `/api/research/results`
+  (written by `python -m experiments.benchmark`).
 
 - **Live** — runs a real local training subprocess
   (`training/fashion_mnist_cnn.py`) on this machine, samples this

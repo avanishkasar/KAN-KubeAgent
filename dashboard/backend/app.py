@@ -93,6 +93,50 @@ def gate_info():
     ]}
 
 
+_network_cache: dict[int, dict] = {}
+
+
+def _active_gate() -> KANGate:
+    """The gate the live session is using, else the checkpoint on disk."""
+    return live_session.gate or get_gate()
+
+
+@app.get("/api/gate/network")
+def gate_network():
+    """The KAN's real structure: every edge's learned function, sampled."""
+    from kan_gate.introspect import network
+
+    gate = _active_gate()
+    if id(gate) not in _network_cache:
+        _network_cache[id(gate)] = network(gate)
+    return _network_cache[id(gate)]
+
+
+class ExplainRequest(BaseModel):
+    features: dict[str, float]
+
+
+@app.post("/api/gate/explain")
+def gate_explain(req: ExplainRequest):
+    """Trace one feature vector through the KAN (what-if exploration)."""
+    from kan_gate.introspect import explain
+
+    return explain(_active_gate(), req.features)
+
+
+RESULTS_PATH = REPO_ROOT / "experiments" / "results" / "results.json"
+
+
+@app.get("/api/research/results")
+def research_results():
+    """Offline benchmark output from experiments/benchmark.py, if it has been run."""
+    import json
+
+    if not RESULTS_PATH.exists():
+        return {"available": False}
+    return {"available": True, **json.loads(RESULTS_PATH.read_text())}
+
+
 @app.get("/api/hardware")
 def hardware_snapshot():
     """One-off real hardware read, independent of any live run - used by

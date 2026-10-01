@@ -21,3 +21,10 @@ dashboard/build/
 dashboard.log
 dashboard.log.err
 dashboard.pid
+
+# LaTeX build artifacts (the compiled PDF is kept)
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out

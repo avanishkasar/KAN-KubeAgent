@@ -3,262 +3,345 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KAN-KubeAgent Dashboard</title>
+<title>KAN-KubeAgent Control Room</title>
 <style>
   :root {
-    color-scheme: light;
-    --surface-0: #f4f3f0;
-    --surface-1: #fcfcfb;
-    --surface-2: #ffffff;
-    --border: #e3e1da;
-    --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted: #85837c;
-    --series-1: #2a78d6;
-    --status-good: #0ca30c;
-    --status-warning: #fab219;
-    --status-serious: #ec835a;
-    --status-critical: #d03b3b;
-    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #212120; --border: #34332f;
-      --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #8f8d84;
-      --series-1: #3987e5;
-    }
-  }
-  :root[data-theme="dark"] {
     color-scheme: dark;
-    --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #212120; --border: #34332f;
-    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #8f8d84;
-    --series-1: #3987e5;
+    --bg: #07080b; --surface-1: rgba(22,23,27,0.78); --surface-2: #1d1f24; --surface-solid: #16171b;
+    --border: rgba(255,255,255,0.09); --text-primary: #f4f4f2; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --axis: #383835;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --accent-2: #9085e9;
+    --pos: #3987e5; --neg: #e66767;
+    --status-good: #0ca30c; --status-warning: #fab219; --status-serious: #ec835a; --status-critical: #d03b3b;
+    --glow: 0 0 24px rgba(57,135,229,0.35);
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* legacy names the Mock view uses */
+    --surface-0: var(--bg);
   }
-
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f4f3f0; --surface-1: rgba(252,252,251,0.92); --surface-2: #ffffff; --surface-solid: #fcfcfb;
+    --border: rgba(11,11,11,0.10); --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #85837c;
+    --grid: #e1e0d9; --axis: #c3c2b7;
+    --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --accent-2: #4a3aa7;
+    --pos: #2a78d6; --neg: #e34948; --glow: 0 0 18px rgba(42,120,214,0.20);
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: var(--sans); background: var(--surface-0); color: var(--text-primary); padding: 24px 16px 64px; }
-  .wrap { max-width: 1080px; margin: 0 auto; }
+  body { margin: 0; font-family: var(--sans); color: var(--text-primary); background: var(--bg); min-height: 100vh;
+    background-image: radial-gradient(1200px 600px at 10% -10%, rgba(57,135,229,0.16), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(144,133,233,0.12), transparent 60%),
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: auto, auto, 32px 32px, 32px 32px; padding: 0 16px 64px; }
+  :root[data-theme="light"] body { background-image: radial-gradient(1200px 600px at 10% -10%, rgba(42,120,214,0.10), transparent 60%); }
+  .wrap { max-width: 1320px; margin: 0 auto; }
 
-  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0; max-width: 640px; }
-  .header-actions { display: flex; align-items: center; gap: 10px; }
-  .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary);
-    border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
-
-  /* Mode slider */
-  .mode-slider { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 999px; padding: 3px; margin-bottom: 18px; }
-  .mode-slider button { border: none; background: transparent; color: var(--text-secondary); font-size: 13px;
-    font-weight: 600; padding: 7px 18px; border-radius: 999px; cursor: pointer; }
-  .mode-slider button.active { background: var(--series-1); color: #ffffff; }
+  /* ---------- top bar ---------- */
+  .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 14px 0; margin-bottom: 14px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 260px; }
+  .logo { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 14px;
+    background: linear-gradient(135deg, var(--series-1), var(--accent-2)); color: #fff; box-shadow: var(--glow); }
+  .brand h1 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+  .brand h1 span { background: linear-gradient(90deg, var(--series-1), var(--accent-2), var(--series-3)); background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 6s linear infinite; }
+  .brand p { margin: 2px 0 0; font-size: 11.5px; color: var(--text-muted); }
+  @keyframes shimmer { to { background-position: 200% center; } }
+  .tabs { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; margin: 0 auto; }
+  .tabs button { border: 0; background: transparent; color: var(--text-secondary); font: 600 13px var(--sans); padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+  .tabs button.active { background: linear-gradient(135deg, var(--series-1), var(--accent-2)); color: #fff; box-shadow: var(--glow); }
+  .chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary); padding: 5px 10px;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); white-space: nowrap; }
+  .chip .led { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+  .chip .led.on { background: var(--status-good); box-shadow: 0 0 8px var(--status-good); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  .icon-btn { background: var(--surface-1); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 999px;
+    padding: 5px 10px; font-size: 11.5px; cursor: pointer; }
 
   .view { display: none; }
-  .view.active { display: block; }
+  .view.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(12, 1fr); margin-bottom: 14px; }
+  .span-12 { grid-column: span 12; } .span-8 { grid-column: span 8; } .span-7 { grid-column: span 7; }
+  .span-5 { grid-column: span 5; } .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-3 { grid-column: span 3; }
+  @media (max-width: 980px) { .span-8, .span-7, .span-5, .span-4, .span-6, .span-3 { grid-column: span 12; } }
 
-  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .grid > .panel { margin-bottom: 0; }
+  .panel-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .panel-h h2 { font-size: 13px; margin: 0; letter-spacing: 0.02em; }
+  .panel-h .hint { font-size: 11px; color: var(--text-muted); }
+  .note { font-size: 11.5px; color: var(--text-muted); margin: 6px 0 0; line-height: 1.5; }
+  code { font-family: var(--mono); font-size: 0.92em; }
 
-  form.controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
-  form.controls label { display: flex; flex-direction: column; font-size: 11px; color: var(--text-muted); gap: 4px; }
-  form.controls input { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-primary);
-    border-radius: 6px; padding: 6px 8px; font-size: 13px; width: 110px; }
-  form.controls button { background: var(--series-1); color: white; border: none; border-radius: 6px;
-    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  form.controls button:disabled { opacity: 0.5; cursor: default; }
-  form.controls button.stop-btn { background: var(--status-critical); }
-  .toggle-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  form.controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  form.controls label { display: flex; flex-direction: column; font-size: 10.5px; color: var(--text-muted); gap: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  form.controls input, form.controls select { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-primary);
+    border-radius: 8px; padding: 7px 9px; font-size: 13px; width: 112px; }
+  form.controls select { width: auto; }
+  form.controls button { background: linear-gradient(135deg, var(--series-1), var(--accent-2)); color: #fff; border: none; border-radius: 9px;
+    padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--glow); }
+  form.controls button:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+  form.controls button.stop-btn { background: var(--status-critical); box-shadow: 0 0 18px rgba(208,59,59,0.35); }
+  .toggle-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); padding-bottom: 8px; }
+  form.controls .toggle-row label { flex-direction: row; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--text-secondary); }
 
-  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-  .stat-tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
-  .stat-tile .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .stat-tile .value { font-size: 20px; font-weight: 600; margin-top: 2px; }
-  .stat-tile .value.mono { font-family: var(--mono); font-size: 15px; }
-  .stat-tile .bar-track { height: 5px; border-radius: 3px; background: var(--border); margin-top: 8px; overflow: hidden; }
-  .stat-tile .bar-fill { height: 100%; background: var(--series-1); border-radius: 3px; transition: width 0.4s ease; }
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; }
+  .stat-tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; position: relative; overflow: hidden; }
+  .stat-tile .label { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-tile .value { font-size: 21px; font-weight: 650; margin-top: 3px; }
+  .stat-tile .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .stat-tile .bar-track { height: 4px; border-radius: 3px; background: var(--grid); margin-top: 8px; overflow: hidden; }
+  .stat-tile .bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
   .stat-tile.gpu-off .value { color: var(--text-muted); font-size: 14px; }
 
-  .formula-box { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--text-secondary);
-    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; word-break: break-all; }
+  /* ---------- agent pipeline ---------- */
+  .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 26px; position: relative; }
+  @media (max-width: 980px) { .pipeline { grid-template-columns: 1fr; gap: 10px; } .pipe-node::after { display: none; } }
+  .pipe-node { position: relative; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-height: 104px;
+    transition: border-color .3s, box-shadow .3s; }
+  .pipe-node::after { content: ""; position: absolute; right: -27px; top: 50%; width: 28px; height: 2px; background: var(--axis); }
+  .pipe-node:last-child::after { display: none; }
+  .pipe-node.active { border-color: var(--series-1); box-shadow: 0 0 0 1px var(--series-1), var(--glow); }
+  .pipe-node.active::after { background: linear-gradient(90deg, var(--series-1), transparent); }
+  .pipe-node .tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .pipe-node .name { font-size: 13.5px; font-weight: 650; margin: 3px 0 6px; }
+  .pipe-node .detail { font-size: 11.5px; color: var(--text-secondary); line-height: 1.45; word-break: break-word; }
+  .pipe-node .kind { position: absolute; top: 10px; right: 10px; font-size: 10px; padding: 2px 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted); }
+  .verdict { margin-top: 12px; font-size: 12px; color: var(--text-secondary); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-  svg.chart { width: 100%; height: 280px; display: block; }
-  .axis-line { stroke: var(--border); stroke-width: 1; }
-  .axis-label { fill: var(--text-muted); font-size: 10px; font-family: var(--sans); }
+  svg.chart { width: 100%; display: block; }
+  .axis-line { stroke: var(--axis); stroke-width: 1; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .axis-label { fill: var(--text-muted); font-size: 10.5px; font-family: var(--sans); }
   .loss-line { fill: none; stroke: var(--series-1); stroke-width: 2; }
   .hover-crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
   .hover-dot { fill: var(--series-1); opacity: 0; }
-  .decision-marker { stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
-  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+  .decision-marker { stroke: var(--surface-solid); stroke-width: 2; cursor: pointer; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 11.5px; color: var(--text-secondary); }
   .legend-item { display: flex; align-items: center; gap: 6px; }
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .legend-line { width: 16px; height: 2px; display: inline-block; border-radius: 2px; }
 
-  #tooltip { position: fixed; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--text-primary); box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-    display: none; z-index: 10; max-width: 260px; }
-  #tooltip .t-row { display: flex; justify-content: space-between; gap: 12px; }
+  #tooltip { position: fixed; pointer-events: none; background: var(--surface-solid); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    font-size: 12px; color: var(--text-primary); box-shadow: 0 8px 24px rgba(0,0,0,0.35); display: none; z-index: 50; max-width: 300px; }
+  #tooltip .t-row { display: flex; justify-content: space-between; gap: 14px; }
   #tooltip .t-label { color: var(--text-muted); }
 
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.03em; }
+  th { color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.ours td { background: rgba(57,135,229,0.08); }
   td.formula-cell { font-family: var(--mono); font-size: 11.5px; color: var(--text-secondary); max-width: 420px; word-break: break-all; }
+  #live-audit-body td.formula-cell { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   td.rationale-cell { color: var(--text-muted); font-size: 11.5px; max-width: 260px; }
 
-  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
-    font-size: 11px; font-weight: 600; border: 1px solid transparent; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
   .badge .dot { width: 7px; height: 7px; border-radius: 50%; }
-  .badge.continue { color: var(--status-good); border-color: color-mix(in srgb, var(--status-good) 40%, transparent); }
-  .badge.continue .dot { background: var(--status-good); }
-  .badge.adjust_lr { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 50%, transparent); }
-  .badge.adjust_lr .dot { background: var(--status-warning); }
-  .badge.early_stop { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 40%, transparent); }
-  .badge.early_stop .dot { background: var(--status-critical); }
-  .badge.idle { color: var(--text-muted); border-color: var(--border); }
-  .badge.idle .dot { background: var(--text-muted); }
-  .badge.running { color: var(--series-1); border-color: color-mix(in srgb, var(--series-1) 40%, transparent); }
-  .badge.running .dot { background: var(--series-1); }
+  .badge.continue { color: var(--status-good); border-color: color-mix(in srgb, var(--status-good) 45%, transparent); } .badge.continue .dot { background: var(--status-good); }
+  .badge.adjust_lr { color: var(--status-warning); border-color: color-mix(in srgb, var(--status-warning) 50%, transparent); } .badge.adjust_lr .dot { background: var(--status-warning); }
+  .badge.early_stop { color: var(--status-critical); border-color: color-mix(in srgb, var(--status-critical) 45%, transparent); } .badge.early_stop .dot { background: var(--status-critical); }
+  .badge.idle { color: var(--text-muted); border-color: var(--border); } .badge.idle .dot { background: var(--text-muted); }
+  .badge.running { color: var(--series-1); border-color: color-mix(in srgb, var(--series-1) 45%, transparent); } .badge.running .dot { background: var(--series-1); animation: pulse 1.4s infinite; }
+  .badge.agree { color: var(--status-good); border-color: var(--border); } .badge.override { color: var(--status-serious); border-color: var(--border); }
 
   .empty-state { color: var(--text-muted); font-size: 13px; padding: 24px; text-align: center; }
-  .error-banner { background: var(--status-critical); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .error-banner { background: var(--status-critical); color: white; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: none; }
+  .formula-box { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--text-secondary); background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; word-break: break-all; }
 
-  /* Live event log */
-  .log-panel { background: #0d0d0c; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
-    height: 260px; overflow-y: auto; font-family: var(--mono); font-size: 11.5px; line-height: 1.7; }
+  .log-panel { background: #050607; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; height: 300px; overflow-y: auto;
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.7; }
+  :root[data-theme="light"] .log-panel { background: #0d0d0c; }
   .log-line { white-space: pre-wrap; word-break: break-word; }
   .log-line .ts { color: #6b6a64; margin-right: 8px; }
-  .log-line.info { color: #cfcec6; }
-  .log-line.process { color: #7fb0e0; }
-  .log-line.warning { color: var(--status-warning); }
-  .log-line.critical { color: #ff8a80; font-weight: 600; }
+  .log-line.info { color: #cfcec6; } .log-line.process { color: #7fb0e0; }
+  .log-line.warning { color: var(--status-warning); } .log-line.critical { color: #ff8a80; font-weight: 600; }
 
-  .note { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
+  /* ---------- KAN network ---------- */
+  .kan-edge { fill: none; stroke-linecap: round; }
+  .kan-edge.flow { stroke-dasharray: 6 10; animation: flow 1.1s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset: -16; } }
+  .kan-node-label { fill: var(--text-primary); font-size: 12px; font-family: var(--sans); }
+  .kan-node-sub { fill: var(--text-muted); font-size: 10.5px; font-family: var(--mono); }
+  .slider-row { display: grid; grid-template-columns: 1fr 44px; gap: 6px 10px; align-items: center; margin-bottom: 12px; }
+  .slider-row label { grid-column: span 2; font-size: 11.5px; color: var(--text-secondary); }
+  .slider-row input[type=range] { width: 100%; accent-color: var(--series-1); }
+  .slider-row output { font-family: var(--mono); font-size: 12px; text-align: right; }
+  .gauge-score { font-size: 44px; font-weight: 750; letter-spacing: -0.02em; }
+  .small-multiples { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .sm-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+  .sm-card .t { font-size: 11px; color: var(--text-secondary); }
+  .sm-card .e { font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); word-break: break-all; margin-top: 2px; }
+  select.picker { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font-size: 12px; width: 100%; }
+  .btn-ghost { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 12px; cursor: pointer; width: 100%; margin-bottom: 10px; }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div>
-      <h1>KAN-KubeAgent — Fine-Tuning Job Optimizer</h1>
-      <p class="subtitle">Every agent decision is gated by the KAN and shown with the symbolic formula that
-        justified it. See <code>research/proposal/methodology_draft.md</code> for the design.</p>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">KAN</div>
+      <div><h1><span>KAN-KubeAgent</span> Control Room</h1>
+        <p>Interpretable agentic control of real training jobs, one formula per decision</p></div>
     </div>
-    <div class="header-actions">
-      <button class="theme-toggle" id="theme-toggle" type="button">Toggle theme</button>
+    <nav class="tabs" id="mode-slider">
+      <button type="button" data-mode="live" class="active">Live</button>
+      <button type="button" data-mode="kan">KAN Network</button>
+      <button type="button" data-mode="research">Research</button>
+      <button type="button" data-mode="mock">Mock / Synthetic</button>
+    </nav>
+    <div class="chips">
+      <span class="chip"><span class="led" id="chip-led"></span><span id="chip-phase">Idle</span></span>
+      <span class="chip" id="chip-cpu">CPU</span>
+      <span class="chip" id="chip-gpu">GPU</span>
+      <button class="icon-btn" id="theme-toggle" type="button">Theme</button>
     </div>
   </header>
-
-  <div class="mode-slider" id="mode-slider">
-    <button type="button" data-mode="live" class="active">Live</button>
-    <button type="button" data-mode="mock">Mock / Synthetic</button>
-  </div>
 
   <div class="error-banner" id="error-banner"></div>
 
   <!-- ============================= LIVE VIEW ============================= -->
   <section class="view active" id="live-view">
     <div class="panel">
+      <div class="panel-h"><h2>Control deck</h2><span class="hint">Real subprocess training on this machine's CPU/GPU, Fashion-MNIST, no synthetic fallback</span></div>
       <form class="controls" id="live-form">
         <label>Job name<input type="text" name="job_name" value="live-finetune-01"></label>
-        <label>Epochs<input type="number" name="epochs" value="20" min="2" max="200"></label>
-        <label>Check every<input type="number" name="check_every" value="3" min="1" max="10"></label>
-        <label>Learning rate<input type="number" step="0.0001" name="lr" value="0.0002"></label>
-        <label>Batch size<input type="number" name="batch_size" value="128" min="8" max="512"></label>
+        <label>Epochs<input type="number" name="epochs" value="30" min="2" max="200"></label>
+        <label>Check every<input type="number" name="check_every" value="2" min="1" max="10"></label>
+        <label>Learning rate<input type="number" step="0.0001" name="lr" value="0.001"></label>
+        <label>Batch size<input type="number" name="batch_size" value="64" min="8" max="512"></label>
         <label>Subset size<input type="number" name="subset_size" value="4000" min="200" max="60000"></label>
-        <label>Mode
-          <select name="mode" id="live-mode-select">
-            <option value="background">Background (low, capped usage)</option>
+        <label>Mode<select name="mode">
+            <option value="background">Background (low, capped)</option>
             <option value="normal" selected>Normal</option>
-            <option value="turbo">Turbo (max CPU/GPU throughput)</option>
-          </select>
-        </label>
-        <label>GPU
-          <select name="gpu_index" id="live-gpu-select">
-            <option value="">Auto</option>
-          </select>
-        </label>
-        <div class="toggle-row">
-          <input type="checkbox" id="live-auto">
-          <label for="live-auto" style="color:var(--text-secondary); font-size:12px;">Auto-continuous</label>
-        </div>
+            <option value="turbo">Turbo (max throughput)</option></select></label>
+        <label>GPU<select name="gpu_index" id="live-gpu-select"><option value="">Auto</option></select></label>
+        <div class="toggle-row"><input type="checkbox" id="live-auto"><label for="live-auto">Auto-continuous</label></div>
         <button type="submit" id="live-start-btn">Start real training</button>
         <button type="button" id="live-stop-btn" class="stop-btn" disabled>Stop</button>
       </form>
-      <p class="note">Runs a real local training subprocess (<code>training/fashion_mnist_cnn.py</code>) on this
-        machine's real CPU/GPU — actual forward/backward passes, actual hardware load, no synthetic fallback (it
-        fails loudly if Fashion-MNIST can't be downloaded).</p>
-      <p class="note"><strong>Background</strong> caps the process to ~25% of your CPU cores, single-threads it, and
-        adds a small per-batch delay — a real, visible low-usage mode, not just a scheduling hint, so it stays out
-        of the way even when the machine is otherwise idle. <strong>Turbo</strong> raises DataLoader workers and
-        enables mixed precision for maximum throughput — expect high CPU/GPU usage by design in this mode.
-        <strong>Auto-continuous</strong> keeps starting a fresh real run the moment one finishes (a new loss curve
-        each time — nothing carries over between runs), so it keeps learning and harvesting real decision points
-        indefinitely; the "Auto run #" and "Epochs trained (session)" tiles below track total progress across all
-        of them. Click Stop to end it. If you have more than one GPU, pick which one to train on in the
-        <strong>GPU</strong> dropdown. See <code>dashboard/README.md</code>.</p>
     </div>
 
     <div class="panel">
-      <div class="stat-row" id="live-stat-row">
+      <div class="stat-row">
         <div class="stat-tile"><div class="label">Status</div><div class="value" id="live-stat-phase"><span class="badge idle"><span class="dot"></span>Idle</span></div></div>
-        <div class="stat-tile"><div class="label">Epoch (this run)</div><div class="value" id="live-stat-epoch">—</div></div>
-        <div class="stat-tile"><div class="label">Auto run #</div><div class="value" id="live-stat-run">—</div></div>
-        <div class="stat-tile"><div class="label">Epochs trained (session)</div><div class="value" id="live-stat-total-epochs">—</div></div>
-        <div class="stat-tile"><div class="label">CPU</div><div class="value" id="live-stat-cpu">—</div>
-          <div class="bar-track"><div class="bar-fill" id="live-stat-cpu-bar" style="width:0%"></div></div></div>
-        <div class="stat-tile"><div class="label">Memory</div><div class="value" id="live-stat-mem">—</div>
-          <div class="bar-track"><div class="bar-fill" id="live-stat-mem-bar" style="width:0%"></div></div></div>
-        <div class="stat-tile" id="live-stat-gpu-tile"><div class="label">GPU</div><div class="value" id="live-stat-gpu">—</div>
-          <div class="bar-track"><div class="bar-fill" id="live-stat-gpu-bar" style="width:0%"></div></div></div>
-        <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="live-stat-decision">—</div></div>
+        <div class="stat-tile"><div class="label">Epoch (this run)</div><div class="value" id="live-stat-epoch">—</div><div class="sub" id="live-stat-lr"></div></div>
+        <div class="stat-tile"><div class="label">Val accuracy</div><div class="value" id="live-stat-acc">—</div><div class="sub" id="live-stat-bestloss"></div></div>
+        <div class="stat-tile"><div class="label">Auto run #</div><div class="value" id="live-stat-run">—</div><div class="sub" id="live-stat-total-epochs"></div></div>
+        <div class="stat-tile"><div class="label">CPU</div><div class="value" id="live-stat-cpu">—</div><div class="bar-track"><div class="bar-fill" id="live-stat-cpu-bar" style="width:0%;background:var(--series-1)"></div></div></div>
+        <div class="stat-tile"><div class="label">Memory</div><div class="value" id="live-stat-mem">—</div><div class="bar-track"><div class="bar-fill" id="live-stat-mem-bar" style="width:0%;background:var(--series-2)"></div></div></div>
+        <div class="stat-tile" id="live-stat-gpu-tile"><div class="label">GPU</div><div class="value" id="live-stat-gpu">—</div><div class="bar-track"><div class="bar-fill" id="live-stat-gpu-bar" style="width:0%;background:var(--series-3)"></div></div></div>
+        <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="live-stat-decision">—</div><div class="sub" id="live-stat-counts"></div></div>
       </div>
       <div id="live-gpu-extra" style="margin-top:10px; display:none;"></div>
     </div>
 
     <div class="panel">
-      <div style="display:flex; justify-content:space-between; align-items:baseline;">
-        <strong style="font-size:13px;">Real-time hardware load</strong>
-        <span style="font-size:11px; color:var(--text-muted);">CPU / Memory / GPU, sampled every ~2s</span>
+      <div class="panel-h"><h2>Agent pipeline</h2><span class="hint">Each node lights up as LangGraph actually finishes it</span></div>
+      <div class="pipeline" id="pipeline"></div>
+      <div class="verdict" id="verdict"><span>Waiting for the first agent invocation…</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="panel span-7">
+        <div class="panel-h"><h2>Loss and gate decisions</h2><span class="hint" id="live-chart-hint">Waiting for a run…</span></div>
+        <svg class="chart" id="live-chart" viewBox="0 0 760 300" preserveAspectRatio="none" style="height:300px"></svg>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-line" style="background:var(--series-1)"></span>Validation loss</span>
+          <span class="legend-item"><span class="legend-line" style="background:var(--series-2)"></span>Training loss</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--status-good)"></span>Continue</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--status-warning)"></span>Adjust LR</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--status-critical)"></span>Early stop</span>
+        </div>
       </div>
-      <svg class="chart" id="hw-chart" viewBox="0 0 1000 160" preserveAspectRatio="none" style="height:160px;"></svg>
-      <div class="legend">
-        <span class="legend-item"><span class="legend-dot" style="background:var(--series-1)"></span>CPU %</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--status-warning)"></span>Memory %</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--status-good)"></span>GPU %</span>
+      <div class="panel span-5">
+        <div class="panel-h"><h2>Inside the KAN, latest decision</h2><span class="hint">Edge width = learned importance, color = signed value</span></div>
+        <svg class="chart" id="mini-kan" viewBox="0 0 520 230" style="height:230px"></svg>
+        <svg class="chart" id="mini-contrib" viewBox="0 0 520 120" style="height:120px"></svg>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel span-6">
+        <div class="panel-h"><h2>Real-time hardware load</h2><span class="hint">psutil + nvidia-smi, every ~2 s</span></div>
+        <svg class="chart" id="hw-chart" viewBox="0 0 640 180" preserveAspectRatio="none" style="height:180px"></svg>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-line" style="background:var(--series-1)"></span>CPU %</span>
+          <span class="legend-item"><span class="legend-line" style="background:var(--series-2)"></span>Memory %</span>
+          <span class="legend-item"><span class="legend-line" style="background:var(--series-3)"></span>GPU %</span>
+        </div>
+      </div>
+      <div class="panel span-6">
+        <div class="panel-h"><h2>Process and decision log</h2><span class="hint">Subprocess stdout, agent steps, gate verdicts</span></div>
+        <div class="log-panel" id="live-log"></div>
       </div>
     </div>
 
     <div class="panel">
-      <div style="display:flex; justify-content:space-between; align-items:baseline;">
-        <strong style="font-size:13px;">Live loss curve &amp; gate decisions</strong>
-        <span style="font-size:11px; color:var(--text-muted);" id="live-chart-hint">Waiting for a run…</span>
-      </div>
-      <svg class="chart" id="live-chart" viewBox="0 0 1000 280" preserveAspectRatio="none"></svg>
-      <div class="legend">
-        <span class="legend-item"><span class="legend-dot" style="background:var(--series-1)"></span>Loss</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--status-good)"></span>Continue</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--status-warning)"></span>Adjust LR</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--status-critical)"></span>Early stop</span>
-      </div>
-    </div>
-
-    <div class="panel">
-      <strong style="font-size:13px;">Live process &amp; decision log</strong>
-      <p class="note" style="margin-top:2px;">What's actually happening under the hood right now — process
-        lifecycle, hardware, and every KAN gate decision, as it happens.</p>
-      <div class="log-panel" id="live-log" style="margin-top:10px;"></div>
-    </div>
-
-    <div class="panel">
-      <strong style="font-size:13px;">Decision audit log</strong>
-      <div style="overflow-x:auto; margin-top:10px;">
+      <div class="panel-h"><h2>Decision audit log</h2><span class="hint">Every action, with the exact formula that made it</span></div>
+      <div style="overflow-x:auto;">
         <table>
-          <thead><tr><th>Epoch</th><th>Decision</th><th>Score</th><th>Outcome</th><th>Formula</th><th>LLM proposal</th></tr></thead>
+          <thead><tr><th>Epoch</th><th>Decision</th><th class="num">Score</th><th>Top driver</th><th>Outcome</th><th>LLM proposal</th><th>Formula</th></tr></thead>
           <tbody id="live-audit-body"></tbody>
         </table>
         <div class="empty-state" id="live-audit-empty">Start a live run to see decisions here.</div>
       </div>
     </div>
+  </section>
+
+  <!-- ============================= KAN NETWORK VIEW ============================= -->
+  <section class="view" id="kan-view">
+    <div class="grid">
+      <div class="panel span-3">
+        <div class="panel-h"><h2>Inputs</h2><span class="hint">Drag to ask "what if"</span></div>
+        <button class="btn-ghost" id="kan-load-latest" type="button">Load latest live decision</button>
+        <select class="picker" id="kan-decision-picker" style="margin-bottom:14px"><option value="">Replay a past decision…</option></select>
+        <div id="kan-sliders"></div>
+      </div>
+      <div class="panel span-6">
+        <div class="panel-h"><h2>KAN gate network</h2><span class="hint">Every edge is a learned function; the plot on it is that function</span></div>
+        <svg class="chart" id="kan-net" viewBox="0 0 760 520" style="height:520px"></svg>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-line" style="background:var(--pos)"></span>Edge pushes score up</span>
+          <span class="legend-item"><span class="legend-line" style="background:var(--neg)"></span>Edge pushes score down</span>
+          <span class="legend-item">Width = learned importance</span>
+        </div>
+      </div>
+      <div class="panel span-3">
+        <div class="panel-h"><h2>Verdict</h2></div>
+        <div class="gauge-score" id="kan-score">—</div>
+        <div id="kan-decision" style="margin:6px 0 12px"></div>
+        <svg class="chart" id="kan-gauge" viewBox="0 0 300 46" style="height:46px"></svg>
+        <p class="note">Bands: below 40 continue, 40 to 75 adjust learning rate, 75 and above stop.</p>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="panel span-6">
+        <div class="panel-h"><h2>How the score was built</h2><span class="hint">Baseline, plus each feature's exact contribution</span></div>
+        <svg class="chart" id="kan-waterfall" viewBox="0 0 640 260" style="height:260px"></svg>
+        <p class="note" id="kan-additive"></p>
+      </div>
+      <div class="panel span-6">
+        <div class="panel-h"><h2>The formula the gate executes</h2><span class="hint">Symbolic and exact, not a post-hoc explanation</span></div>
+        <div class="formula-box" id="kan-formula">Loading…</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Learned edge functions</h2><span class="hint">Small multiples, one per active edge; dot = current input</span></div>
+      <div class="small-multiples" id="kan-edges"></div>
+    </div>
+  </section>
+
+  <!-- ============================= RESEARCH VIEW ============================= -->
+  <section class="view" id="research-view">
+    <div id="research-root"><div class="panel"><div class="empty-state">Loading benchmark results…</div></div></div>
   </section>
 
   <!-- ============================= MOCK VIEW ============================= -->
@@ -326,6 +409,7 @@
       </div>
     </div>
   </section>
+
 </div>
 
 <div id="tooltip"></div>
@@ -333,10 +417,33 @@
 <script>
 const API_BASE = window.location.origin;
 const WS_BASE = API_BASE.replace(/^http/, 'ws');
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const mk = (tag, attrs = {}, text) => { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); if (text != null) el.textContent = text; return el; };
+const FEATURES = ['loss_plateau_score', 'gradient_trend', 'lr_decay_benefit', 'gpu_hours_remaining_vs_budget', 'epochs_since_improvement'];
+const FEATURE_LABEL = { loss_plateau_score: 'Loss plateau', gradient_trend: 'Gradient trend', lr_decay_benefit: 'LR-decay benefit',
+  gpu_hours_remaining_vs_budget: 'Budget remaining', epochs_since_improvement: 'Since improvement' };
+const STATUS = { continue: 'var(--status-good)', adjust_lr: 'var(--status-warning)', early_stop: 'var(--status-critical)' };
+const tooltip = $('tooltip');
+function showTip(evt, html) { tooltip.innerHTML = html; tooltip.style.display = 'block';
+  tooltip.style.left = `${Math.min(window.innerWidth - 310, evt.clientX + 14)}px`; tooltip.style.top = `${evt.clientY + 14}px`; }
+function hideTip() { tooltip.style.display = 'none'; }
+function badge(d) { return `<span class="badge ${d}"><span class="dot"></span>${decisionLabel(d)}</span>`; }
 
-document.getElementById('theme-toggle').addEventListener('click', () => {
-  const root = document.documentElement;
-  root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+$('theme-toggle').addEventListener('click', () => {
+  const r = document.documentElement;
+  r.setAttribute('data-theme', r.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+  redrawAll();
+});
+
+/* ---------- tabs ---------- */
+$('mode-slider').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-mode]');
+  if (!btn) return;
+  document.querySelectorAll('#mode-slider button').forEach(b => b.classList.toggle('active', b === btn));
+  ['live', 'kan', 'research', 'mock'].forEach(m => $(`${m}-view`).classList.toggle('active', btn.dataset.mode === m));
+  if (btn.dataset.mode === 'kan') renderKanView();
+  if (btn.dataset.mode === 'research') loadResearch();
 });
 
 function showError(msg) {
@@ -348,16 +455,6 @@ function showError(msg) {
 function decisionLabel(d) {
   return { continue: 'Continue', adjust_lr: 'Adjust LR', early_stop: 'Early stop' }[d] || d;
 }
-
-/* ---------- mode slider ---------- */
-document.getElementById('mode-slider').addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-mode]');
-  if (!btn) return;
-  document.querySelectorAll('.mode-slider button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('live-view').classList.toggle('active', btn.dataset.mode === 'live');
-  document.getElementById('mock-view').classList.toggle('active', btn.dataset.mode === 'mock');
-});
 
 /* ---------- shared: incremental SVG line chart ---------- */
 function drawChart(svgEl, losses, decisions, epochIndexFn) {
@@ -488,228 +585,534 @@ document.getElementById('synthetic-plateau').addEventListener('change', (e) => {
 });
 loadGateFormula();
 
+
 /* ================= LIVE VIEW ================= */
 let liveWs = null;
-let liveState = { losses: [], decisions: [] };
+const live = { loss: [], val: [], acc: [], decisions: [], hw: [], lr: null, steps: {} };
+const fmtPct = (v) => v == null ? '—' : `${v.toFixed(0)}%`;
 
-function fmtPercent(v) { return v == null ? '—' : `${v.toFixed(0)}%`; }
-
-function renderLiveHardware(sample) {
-  if (!sample) return;
-  document.getElementById('live-stat-cpu').textContent = fmtPercent(sample.cpu_percent);
-  document.getElementById('live-stat-cpu-bar').style.width = `${Math.min(100, sample.cpu_percent)}%`;
-  document.getElementById('live-stat-mem').textContent = fmtPercent(sample.memory_percent);
-  document.getElementById('live-stat-mem-bar').style.width = `${Math.min(100, sample.memory_percent)}%`;
-
-  const gpuTile = document.getElementById('live-stat-gpu-tile');
-  const gpuVal = document.getElementById('live-stat-gpu');
-  const gpuBar = document.getElementById('live-stat-gpu-bar');
-  const extra = document.getElementById('live-gpu-extra');
-  if (sample.gpu_available && sample.gpus.length) {
-    gpuTile.classList.remove('gpu-off');
-    const g = sample.gpus[0];
-    gpuVal.textContent = `${g.utilization_percent.toFixed(0)}% (${g.name})`;
-    gpuBar.style.width = `${Math.min(100, g.utilization_percent)}%`;
-    if (sample.gpus.length > 1) {
-      extra.style.display = 'block';
-      extra.innerHTML = sample.gpus.map(gpu => `
-        <div style="display:flex; justify-content:space-between; font-size:11.5px; color:var(--text-secondary); padding:4px 0; border-bottom:1px solid var(--border);">
-          <span>GPU ${gpu.index}: ${gpu.name}</span>
-          <span>${gpu.utilization_percent.toFixed(0)}% · ${gpu.memory_used_mb.toFixed(0)}/${gpu.memory_total_mb.toFixed(0)} MB · ${gpu.temperature_c.toFixed(0)}°C</span>
-        </div>`).join('');
-    } else {
-      extra.style.display = 'none';
-    }
-  } else {
-    gpuTile.classList.add('gpu-off');
-    gpuVal.textContent = 'No GPU detected';
-    gpuBar.style.width = '0%';
-    extra.style.display = 'none';
+function linePlot(svg, W, H, series, opts = {}) {
+  svg.innerHTML = '';
+  const pad = { l: 44, r: 14, t: 12, b: 24 };
+  const all = series.flatMap(s => s.values.filter(v => v != null));
+  if (!all.length) return null;
+  const n = Math.max(...series.map(s => s.values.length));
+  let lo = opts.min ?? Math.min(...all), hi = opts.max ?? Math.max(...all);
+  if (hi - lo < 1e-9) { hi = lo + 1; }
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const x = (i) => pad.l + (n <= 1 ? 0 : (i / (n - 1)) * pw);
+  const y = (v) => pad.t + ph - ((v - lo) / (hi - lo)) * ph;
+  for (let k = 0; k <= 4; k++) {
+    const v = lo + (k / 4) * (hi - lo), yy = y(v);
+    svg.appendChild(mk('line', { class: 'grid-line', x1: pad.l, x2: W - pad.r, y1: yy, y2: yy }));
+    svg.appendChild(mk('text', { class: 'axis-label', x: pad.l - 6, y: yy + 3, 'text-anchor': 'end' }, opts.fmt ? opts.fmt(v) : v.toFixed(2)));
   }
+  svg.appendChild(mk('line', { class: 'axis-line', x1: pad.l, x2: W - pad.r, y1: pad.t + ph, y2: pad.t + ph }));
+  if (opts.xlabel) svg.appendChild(mk('text', { class: 'axis-label', x: W - pad.r, y: H - 6, 'text-anchor': 'end' }, opts.xlabel(n)));
+  series.forEach(s => {
+    const d = s.values.map((v, i) => v == null ? '' : `${i === 0 ? 'M' : 'L'}${x(i)},${y(v)}`).join(' ');
+    if (d.trim()) svg.appendChild(mk('path', { d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  });
+  return { x, y, pad, pw, ph, n, lo, hi };
 }
 
-/* ---------- real-time hardware history chart (CPU/Mem/GPU %) ---------- */
-let hwHistory = [];  // [{cpu, mem, gpu}]
-const HW_HISTORY_MAX = 150;
-
-function pushHwSample(sample) {
-  if (!sample) return;
-  hwHistory.push({
-    cpu: sample.cpu_percent,
-    mem: sample.memory_percent,
-    gpu: sample.gpu_available && sample.gpus.length ? sample.gpus[0].utilization_percent : null,
+function drawLossChart() {
+  const svg = $('live-chart');
+  const series = [{ values: live.val, color: 'var(--series-1)' }, { values: live.loss, color: 'var(--series-2)' }];
+  const g = linePlot(svg, 760, 300, series, { xlabel: (n) => `epoch ${n}` });
+  if (!g) return;
+  const ref = live.val.length ? live.val : live.loss;
+  live.decisions.forEach(d => {
+    const i = Math.max(0, Math.min(ref.length - 1, d.epoch_index));
+    const c = mk('circle', { class: 'decision-marker', cx: g.x(i), cy: g.y(ref[i]), r: 6, fill: STATUS[d.decision] || 'var(--text-muted)' });
+    c.addEventListener('mousemove', (e) => showTip(e, `<b>Epoch ${i + 1}</b><br>${decisionLabel(d.decision)}, score ${d.gate_score.toFixed(1)}<br><span class="t-label">${d.outcome}</span>`));
+    c.addEventListener('mouseleave', hideTip);
+    svg.appendChild(c);
   });
-  if (hwHistory.length > HW_HISTORY_MAX) hwHistory = hwHistory.slice(-HW_HISTORY_MAX);
-  drawHwChart();
+  const cross = mk('line', { class: 'hover-crosshair', y1: g.pad.t, y2: g.pad.t + g.ph });
+  svg.appendChild(cross);
+  const ov = mk('rect', { x: g.pad.l, y: g.pad.t, width: g.pw, height: g.ph, fill: 'transparent' });
+  ov.addEventListener('mousemove', (e) => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(g.n - 1, Math.round(((e.clientX - r.left) / r.width * 760 - g.pad.l) / g.pw * (g.n - 1))));
+    cross.setAttribute('x1', g.x(i)); cross.setAttribute('x2', g.x(i)); cross.style.opacity = 1;
+    showTip(e, `<div class="t-row"><span class="t-label">Epoch</span><b>${i + 1}</b></div>` +
+      (live.val[i] != null ? `<div class="t-row"><span class="t-label">Val loss</span><b>${live.val[i].toFixed(4)}</b></div>` : '') +
+      `<div class="t-row"><span class="t-label">Train loss</span><b>${(live.loss[i] ?? NaN).toFixed(4)}</b></div>` +
+      (live.acc[i] != null ? `<div class="t-row"><span class="t-label">Val acc</span><b>${(100 * live.acc[i]).toFixed(1)}%</b></div>` : ''));
+  });
+  ov.addEventListener('mouseleave', () => { cross.style.opacity = 0; hideTip(); });
+  svg.insertBefore(ov, cross);
 }
 
 function drawHwChart() {
-  const svgEl = document.getElementById('hw-chart');
-  svgEl.innerHTML = '';
-  if (!hwHistory.length) return;
-  const W = 1000, H = 160, padL = 34, padR = 10, padT = 10, padB = 18;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-  const denom = Math.max(1, hwHistory.length - 1);
-  const x = (i) => padL + (i / denom) * plotW;
-  const y = (v) => padT + plotH - (Math.max(0, Math.min(100, v)) / 100) * plotH;
-
-  const ns = 'http://www.w3.org/2000/svg';
-  const mk = (tag, attrs) => { const el = document.createElementNS(ns, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el; };
-
-  svgEl.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT, x2: padL, y2: padT + plotH }));
-  svgEl.appendChild(mk('line', { class: 'axis-line', x1: padL, y1: padT + plotH, x2: padL + plotW, y2: padT + plotH }));
-  const top = mk('text', { class: 'axis-label', x: 2, y: padT + 4 }); top.textContent = '100%';
-  const bot = mk('text', { class: 'axis-label', x: 2, y: padT + plotH }); bot.textContent = '0%';
-  svgEl.appendChild(top); svgEl.appendChild(bot);
-
-  const series = [
-    { key: 'cpu', color: 'var(--series-1)' },
-    { key: 'mem', color: 'var(--status-warning)' },
-    { key: 'gpu', color: 'var(--status-good)' },
-  ];
-  series.forEach(({ key, color }) => {
-    const pts = hwHistory.map((s, i) => ({ i, v: s[key] })).filter(p => p.v != null);
-    if (!pts.length) return;
-    const d = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${x(p.i)} ${y(p.v)}`).join(' ');
-    svgEl.appendChild(mk('path', { d, fill: 'none', stroke: color, 'stroke-width': 2 }));
+  const svg = $('hw-chart');
+  const g = linePlot(svg, 640, 180, [
+    { values: live.hw.map(s => s.cpu_percent), color: 'var(--series-1)' },
+    { values: live.hw.map(s => s.memory_percent), color: 'var(--series-2)' },
+    { values: live.hw.map(s => s.gpu_available && s.gpus.length ? s.gpus[0].utilization_percent : null), color: 'var(--series-3)' },
+  ], { min: 0, max: 100, fmt: (v) => `${v.toFixed(0)}%` });
+  if (!g) return;
+  const ov = mk('rect', { x: g.pad.l, y: g.pad.t, width: g.pw, height: g.ph, fill: 'transparent' });
+  ov.addEventListener('mousemove', (e) => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(g.n - 1, Math.round(((e.clientX - r.left) / r.width * 640 - g.pad.l) / g.pw * (g.n - 1))));
+    const s = live.hw[i];
+    showTip(e, `<div class="t-row"><span class="t-label">CPU</span><b>${s.cpu_percent.toFixed(0)}%</b></div><div class="t-row"><span class="t-label">Memory</span><b>${s.memory_percent.toFixed(0)}%</b></div>` +
+      (s.gpu_available && s.gpus.length ? `<div class="t-row"><span class="t-label">GPU</span><b>${s.gpus[0].utilization_percent.toFixed(0)}%</b></div>` : ''));
   });
+  ov.addEventListener('mouseleave', hideTip);
+  svg.appendChild(ov);
 }
 
-function renderLivePhase(phase) {
-  const el = document.getElementById('live-stat-phase');
-  const cls = phase === 'Running' || phase === 'starting' ? 'running' : 'idle';
+function renderHardware(s) {
+  if (!s) return;
+  $('live-stat-cpu').textContent = fmtPct(s.cpu_percent); $('live-stat-cpu-bar').style.width = `${Math.min(100, s.cpu_percent)}%`;
+  $('live-stat-mem').textContent = fmtPct(s.memory_percent); $('live-stat-mem-bar').style.width = `${Math.min(100, s.memory_percent)}%`;
+  $('chip-cpu').textContent = `${s.cpu_count} CPU cores`;
+  const tile = $('live-stat-gpu-tile'), extra = $('live-gpu-extra');
+  if (s.gpu_available && s.gpus.length) {
+    const g = s.gpus[0];
+    tile.classList.remove('gpu-off');
+    $('live-stat-gpu').textContent = `${g.utilization_percent.toFixed(0)}%`;
+    $('live-stat-gpu-bar').style.width = `${Math.min(100, g.utilization_percent)}%`;
+    $('chip-gpu').textContent = s.gpus.length > 1 ? `${s.gpus.length} GPUs` : g.name;
+    extra.style.display = s.gpus.length > 1 ? 'block' : 'none';
+    extra.innerHTML = s.gpus.map(x => `<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-secondary);padding:4px 0;border-bottom:1px solid var(--border)">
+      <span>GPU ${x.index}: ${x.name}</span><span>${x.utilization_percent.toFixed(0)}% · ${x.memory_used_mb.toFixed(0)}/${x.memory_total_mb.toFixed(0)} MB · ${x.temperature_c.toFixed(0)}°C</span></div>`).join('');
+  } else {
+    tile.classList.add('gpu-off'); $('live-stat-gpu').textContent = 'No GPU detected'; $('live-stat-gpu-bar').style.width = '0%';
+    $('chip-gpu').textContent = 'No GPU'; extra.style.display = 'none';
+  }
+}
+
+function renderPhase(phase) {
+  const running = phase === 'Running' || phase === 'starting';
   const label = { idle: 'Idle', starting: 'Starting', Running: 'Running', Completed: 'Completed', Stopped: 'Stopped' }[phase] || phase;
-  el.innerHTML = `<span class="badge ${cls}"><span class="dot"></span>${label}</span>`;
+  $('live-stat-phase').innerHTML = `<span class="badge ${running ? 'running' : 'idle'}"><span class="dot"></span>${label}</span>`;
+  $('chip-phase').textContent = label; $('chip-led').classList.toggle('on', running);
+  $('live-start-btn').disabled = running; $('live-stop-btn').disabled = !running;
 }
 
-function appendLogLine(entry) {
-  const panel = document.getElementById('live-log');
-  const div = document.createElement('div');
+function renderKpis(snap) {
+  const n = live.loss.length;
+  $('live-stat-epoch').textContent = n || '—';
+  $('live-stat-lr').textContent = live.lr != null ? `lr ${Number(live.lr).toPrecision(3)}` : '';
+  const acc = live.acc[live.acc.length - 1];
+  $('live-stat-acc').textContent = acc != null ? `${(100 * acc).toFixed(1)}%` : '—';
+  $('live-stat-bestloss').textContent = live.val.length ? `best val loss ${Math.min(...live.val).toFixed(3)}` : '';
+  if (snap) {
+    $('live-stat-run').textContent = `#${(snap.auto_run_count || 0) + 1}`;
+    $('live-stat-total-epochs').textContent = `${snap.total_epochs_trained || 0} epochs this session`;
+  }
+  const last = live.decisions[live.decisions.length - 1];
+  $('live-stat-decision').innerHTML = last ? badge(last.decision) : '—';
+  const c = { continue: 0, adjust_lr: 0, early_stop: 0 }; live.decisions.forEach(d => c[d.decision]++);
+  $('live-stat-counts').textContent = live.decisions.length ? `${c.continue} continue · ${c.adjust_lr} adjust · ${c.early_stop} stop` : '';
+}
+
+/* ---------- agent pipeline ---------- */
+const PIPE = [
+  ['metrics_watcher', 'Observe', 'Metrics Watcher', 'code'],
+  ['loss_curve_and_cost', 'Analyse', 'Loss-Curve Analyst + Cost', 'code'],
+  ['supervisor', 'Propose', 'Supervisor', 'LLM'],
+  ['kan_gate', 'Decide', 'KAN Gate', 'KAN'],
+  ['execute', 'Act', 'Executor', 'code'],
+];
+function stepDetail(node, d) {
+  if (!d) return '<span style="color:var(--text-muted)">idle</span>';
+  if (node === 'metrics_watcher') return `${d.epochs_observed} epochs observed<br>lr ${Number(d.lr).toPrecision(3)}`;
+  if (node === 'loss_curve_and_cost') return d.features ? FEATURES.map(f => `${FEATURE_LABEL[f]} ${d.features[f].toFixed(2)}`).slice(0, 3).join('<br>') : '';
+  if (node === 'supervisor') return `proposes <b>${decisionLabel(d.proposal)}</b>`;
+  if (node === 'kan_gate') return `${badge(d.decision)}<br>score ${Number(d.score).toFixed(1)}`;
+  return `${d.outcome}`;
+}
+function renderPipeline(activeNode) {
+  $('pipeline').innerHTML = PIPE.map(([id, tag, name, kind]) => `
+    <div class="pipe-node ${id === activeNode ? 'active' : ''}"><span class="kind">${kind}</span>
+      <div class="tag">${tag}</div><div class="name">${name}</div>
+      <div class="detail">${stepDetail(id, live.steps[id])}</div></div>`).join('');
+}
+let pipeTimer = null;
+function onAgentStep(step) {
+  live.steps[step.node] = step.detail;
+  renderPipeline(step.node);
+  clearTimeout(pipeTimer); pipeTimer = setTimeout(() => renderPipeline(null), 1800);
+}
+function renderVerdict(d) {
+  if (!d) return;
+  const agree = d.llm_proposal === d.decision;
+  $('verdict').innerHTML = `<span>Supervisor proposed <b>${decisionLabel(d.llm_proposal)}</b></span>
+    <span class="badge ${agree ? 'agree' : 'override'}">${agree ? 'KAN agreed' : 'KAN overrode'}</span>
+    <span>KAN gate executed ${badge(d.decision)} at score ${d.gate_score.toFixed(1)}</span>`;
+}
+
+/* ---------- audit + log ---------- */
+function topDriver(d) {
+  const c = d.explanation && d.explanation.contributions; if (!c) return '—';
+  const [k, v] = Object.entries(c).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+  return `${FEATURE_LABEL[k]} ${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
+}
+function renderAudit() {
+  const body = $('live-audit-body');
+  $('live-audit-empty').style.display = live.decisions.length ? 'none' : 'block';
+  body.innerHTML = live.decisions.slice().reverse().map(d => `<tr>
+    <td>${d.epoch_index + 1}</td><td>${badge(d.decision)}</td><td class="num">${d.gate_score.toFixed(1)}</td>
+    <td>${topDriver(d)}</td><td>${d.outcome}</td><td class="rationale-cell">${decisionLabel(d.llm_proposal)}</td>
+    <td class="formula-cell">${d.gate_formula}</td></tr>`).join('');
+}
+function appendLog(entry) {
+  const p = $('live-log'), div = document.createElement('div');
   div.className = `log-line ${entry.level || 'info'}`;
-  const time = new Date(entry.ts * 1000).toLocaleTimeString();
-  div.innerHTML = `<span class="ts">${time}</span>${entry.message}`;
-  panel.appendChild(div);
-  panel.scrollTop = panel.scrollHeight;
-}
-
-function redrawLiveChart() {
-  drawChart(document.getElementById('live-chart'), liveState.losses, liveState.decisions, (e) => e.epoch_index);
-}
-
-function renderLiveTable() {
-  const body = document.getElementById('live-audit-body');
-  const empty = document.getElementById('live-audit-empty');
-  body.innerHTML = '';
-  if (!liveState.decisions.length) { empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-  liveState.decisions.forEach((entry) => body.appendChild(renderAuditRow(entry, entry.epoch_index)));
+  div.innerHTML = `<span class="ts">${new Date(entry.ts * 1000).toLocaleTimeString()}</span>`;
+  div.appendChild(document.createTextNode(entry.message));
+  p.appendChild(div); p.scrollTop = p.scrollHeight;
 }
 
 function applySnapshot(snap) {
-  liveState.losses = snap.loss_history || [];
-  liveState.decisions = snap.decisions || [];
-  document.getElementById('live-log').innerHTML = '';
-  (snap.events || []).forEach(appendLogLine);
-  renderLivePhase(snap.phase);
-  document.getElementById('live-stat-epoch').textContent = liveState.losses.length || '—';
-  document.getElementById('live-stat-run').textContent = snap.auto_run_count != null ? `#${snap.auto_run_count + 1}` : '—';
-  document.getElementById('live-stat-total-epochs').textContent = snap.total_epochs_trained != null ? snap.total_epochs_trained : '—';
-  if (snap.last_hardware) renderLiveHardware(snap.last_hardware);
-  hwHistory = (snap.hardware_history || []).map(s => ({
-    cpu: s.cpu_percent, mem: s.memory_percent,
-    gpu: s.gpu_available && s.gpus.length ? s.gpus[0].utilization_percent : null,
-  })).slice(-HW_HISTORY_MAX);
-  drawHwChart();
-  redrawLiveChart();
-  renderLiveTable();
-  const last = liveState.decisions[liveState.decisions.length - 1];
-  document.getElementById('live-stat-decision').innerHTML = last
-    ? `<span class="badge ${last.decision}"><span class="dot"></span>${decisionLabel(last.decision)}</span>` : '—';
-  document.getElementById('live-chart-hint').textContent = liveState.losses.length ? 'Streaming' : 'Waiting for a run…';
-
-  const running = snap.phase === 'Running' || snap.phase === 'starting';
-  document.getElementById('live-start-btn').disabled = running;
-  document.getElementById('live-stop-btn').disabled = !running;
+  live.loss = snap.loss_history || []; live.val = snap.val_loss_history || []; live.acc = snap.val_acc_history || [];
+  live.decisions = snap.decisions || [];
+  live.hw = (snap.hardware_history || []).slice(-150);
+  $('live-log').innerHTML = ''; (snap.events || []).forEach(appendLog);
+  (snap.agent_steps || []).forEach(s => { live.steps[s.node] = s.detail; });
+  renderPhase(snap.phase); renderKpis(snap); renderPipeline(null);
+  if (snap.last_hardware) renderHardware(snap.last_hardware);
+  $('live-chart-hint').textContent = live.loss.length ? `Run ${snap.current_job || snap.job_name || ''}` : 'Waiting for a run…';
+  const last = live.decisions[live.decisions.length - 1];
+  renderVerdict(last); renderAudit(); drawLossChart(); drawHwChart(); renderMiniKan(last); fillDecisionPicker();
+  live.snap = snap;
 }
 
 function connectLiveSocket() {
   liveWs = new WebSocket(`${WS_BASE}/api/live/stream`);
   liveWs.onmessage = (evt) => {
-    const msg = JSON.parse(evt.data);
-    if (msg.type === 'snapshot') {
-      applySnapshot(msg.data);
-    } else if (msg.type === 'hardware') {
-      renderLiveHardware(msg.data);
-      pushHwSample(msg.data);
-    } else if (msg.type === 'metric') {
-      liveState.losses.push(msg.data.loss);
-      document.getElementById('live-stat-epoch').textContent = msg.data.epoch;
-      document.getElementById('live-chart-hint').textContent = 'Streaming';
-      redrawLiveChart();
-    } else if (msg.type === 'decision') {
-      liveState.decisions.push(msg.data);
-      document.getElementById('live-stat-decision').innerHTML =
-        `<span class="badge ${msg.data.decision}"><span class="dot"></span>${decisionLabel(msg.data.decision)}</span>`;
-      redrawLiveChart();
-      renderLiveTable();
-    } else if (msg.type === 'event') {
-      appendLogLine(msg.data);
-    } else if (msg.type === 'done') {
-      renderLivePhase(msg.data.phase);
-      document.getElementById('live-start-btn').disabled = false;
-      document.getElementById('live-stop-btn').disabled = true;
+    const msg = JSON.parse(evt.data), d = msg.data;
+    if (msg.type === 'snapshot') applySnapshot(d);
+    else if (msg.type === 'hardware') { renderHardware(d); live.hw.push(d); live.hw = live.hw.slice(-150); drawHwChart(); }
+    else if (msg.type === 'metric') {
+      live.loss.push(d.loss); if (d.val_loss != null) { live.val.push(d.val_loss); live.acc.push(d.val_acc); }
+      live.lr = d.lr; if (live.snap) live.snap.total_epochs_trained = (live.snap.total_epochs_trained || 0) + 1;
+      $('live-chart-hint').textContent = 'Streaming'; renderKpis(live.snap); drawLossChart();
     }
+    else if (msg.type === 'agent_step') onAgentStep(d);
+    else if (msg.type === 'decision') {
+      live.decisions.push(d); renderKpis(live.snap); renderVerdict(d); renderAudit(); drawLossChart(); renderMiniKan(d); fillDecisionPicker();
+      if ($('kan-view').classList.contains('active') && kanFollowLive) setKanFeatures(d.features);
+    }
+    else if (msg.type === 'event') appendLog(d);
+    else if (msg.type === 'done') renderPhase(d.phase);
   };
-  liveWs.onclose = () => { setTimeout(connectLiveSocket, 2000); };
-  liveWs.onerror = () => { liveWs.close(); };
+  liveWs.onclose = () => setTimeout(connectLiveSocket, 2000);
+  liveWs.onerror = () => liveWs.close();
 }
-connectLiveSocket();
 
-/* ---------- populate GPU select if the machine has more than one ---------- */
-async function loadGpuOptions() {
-  try {
-    const res = await fetch(`${API_BASE}/api/hardware`);
-    const hw = await res.json();
-    if (!hw.gpu_available || hw.gpus.length < 2) return;  // "Auto" is enough for 0 or 1 GPU
-    const select = document.getElementById('live-gpu-select');
-    hw.gpus.forEach((g) => {
-      const opt = document.createElement('option');
-      opt.value = g.index;
-      opt.textContent = `[${g.index}] ${g.name}`;
-      select.appendChild(opt);
-    });
-  } catch (e) { /* dropdown just stays "Auto" if this fails */ }
-}
-loadGpuOptions();
-
-document.getElementById('live-form').addEventListener('submit', async (evt) => {
-  evt.preventDefault();
-  showError('');
-  const form = new FormData(evt.target);
-  const gpuChoice = form.get('gpu_index');
-  const payload = {
-    job_name: form.get('job_name'), epochs: parseInt(form.get('epochs'), 10),
-    check_every: parseInt(form.get('check_every'), 10), lr: parseFloat(form.get('lr')),
-    batch_size: parseInt(form.get('batch_size'), 10), subset_size: parseInt(form.get('subset_size'), 10),
-    mode: form.get('mode'), auto: document.getElementById('live-auto').checked,
-    gpu_index: gpuChoice === '' ? null : parseInt(gpuChoice, 10),
-  };
-  document.getElementById('live-start-btn').disabled = true;
-  document.getElementById('live-stop-btn').disabled = false;
+$('live-form').addEventListener('submit', async (evt) => {
+  evt.preventDefault(); showError('');
+  const f = new FormData(evt.target), gpu = f.get('gpu_index');
+  const payload = { job_name: f.get('job_name'), epochs: +f.get('epochs'), check_every: +f.get('check_every'), lr: parseFloat(f.get('lr')),
+    batch_size: +f.get('batch_size'), subset_size: +f.get('subset_size'), mode: f.get('mode'), auto: $('live-auto').checked,
+    gpu_index: gpu === '' ? null : +gpu };
+  renderPhase('starting');
   try {
     const res = await fetch(`${API_BASE}/api/live/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error(`Backend returned ${res.status}`);
-  } catch (e) {
-    showError(`Could not start live run: ${e.message}. Is the backend running? See dashboard/README.md.`);
-    document.getElementById('live-start-btn').disabled = false;
-    document.getElementById('live-stop-btn').disabled = true;
-  }
+  } catch (e) { showError(`Could not start live run: ${e.message}`); renderPhase('idle'); }
+});
+$('live-stop-btn').addEventListener('click', async () => {
+  try { await fetch(`${API_BASE}/api/live/stop`, { method: 'POST' }); } catch (e) { showError(`Could not stop run: ${e.message}`); }
 });
 
-document.getElementById('live-stop-btn').addEventListener('click', async () => {
-  try { await fetch(`${API_BASE}/api/live/stop`, { method: 'POST' }); }
-  catch (e) { showError(`Could not stop run: ${e.message}`); }
-});
+/* ================= KAN NETWORK ================= */
+let kanNet = null, kanExpl = null, kanFollowLive = true, kanFeatures = Object.fromEntries(FEATURES.map(f => [f, 0.5]));
+async function loadNetwork() {
+  if (kanNet) return kanNet;
+  const res = await fetch(`${API_BASE}/api/gate/network`); kanNet = await res.json();
+  $('kan-formula').textContent = kanNet.formula;
+  return kanNet;
+}
+function edgeValue(expl, e) {
+  if (!expl) return 0;
+  const v = expl.edge_values.find(x => x.layer === e.layer && x.i === e.i && x.j === e.j);
+  return v ? v.value : 0;
+}
+function drawNetwork(svg, net, expl, W, H, opts = {}) {
+  svg.innerHTML = '';
+  const L = net.layers, cols = L.length;
+  const padX = opts.padX ?? 110, padY = 34;
+  const colX = (l) => padX + (l / (cols - 1)) * (W - 2 * padX);
+  const nodeY = (l, k) => L[l] === 1 ? H / 2 : padY + (k / (L[l] - 1)) * (H - 2 * padY);
+  const maxImp = Math.max(...net.edges.filter(e => e.active).map(e => e.importance), 1e-9);
+  const vals = net.edges.filter(e => e.active).map(e => Math.abs(edgeValue(expl, e)));
+  const maxVal = Math.max(...vals, 1e-9);
+  const deadHidden = new Set();
+  for (let l = 1; l < cols - 1; l++) for (let k = 0; k < L[l]; k++)
+    if (!net.edges.some(e => e.layer === l - 1 && e.j === k && e.active)) deadHidden.add(`${l}-${k}`);
+  const topEdges = new Set(net.edges.filter(e => e.active).sort((a, b) => b.importance - a.importance).slice(0, 4));
+  net.edges.filter(e => e.active).forEach(e => {
+    const x1 = colX(e.layer), y1 = nodeY(e.layer, e.i), x2 = colX(e.layer + 1), y2 = nodeY(e.layer + 1, e.j);
+    const mx = (x1 + x2) / 2, v = edgeValue(expl, e);
+    const color = v >= 0 ? 'var(--pos)' : 'var(--neg)';
+    const width = 1.5 + 6 * Math.sqrt(e.importance / maxImp);
+    const d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+    svg.appendChild(mk('path', { d, class: 'kan-edge', stroke: 'var(--axis)', 'stroke-width': width + 2, opacity: 0.35 }));
+    const p = mk('path', { d, class: `kan-edge ${expl ? 'flow' : ''}`, stroke: color, 'stroke-width': width,
+      opacity: expl ? 0.25 + 0.75 * Math.abs(v) / maxVal : 0.55 });
+    p.addEventListener('mousemove', (ev) => showTip(ev, `<b>${net.feature_names[e.i] && e.layer === 0 ? FEATURE_LABEL[net.feature_names[e.i]] : 'hidden ' + e.i} → ${e.layer + 1 === cols - 1 ? 'score' : 'hidden ' + e.j}</b><br><code>φ(x) = ${e.expr}</code>${expl ? `<br>value now: ${v.toFixed(2)}` : ''}`));
+    p.addEventListener('mouseleave', hideTip);
+    svg.appendChild(p);
+    if (opts.sparklines && topEdges.has(e)) {
+      const bw = 64, bh = 30, t = 0.5;
+      const bx = x1 + (x2 - x1) * t - bw / 2, by = y1 + (y2 - y1) * t - bh / 2;
+      const xs = e.curve.x, ys = e.curve.y, xl = xs[0], xh = xs[xs.length - 1], yl = Math.min(...ys), yh = Math.max(...ys);
+      const sx = (vv) => bx + 4 + ((vv - xl) / ((xh - xl) || 1)) * (bw - 8), sy = (vv) => by + bh - 4 - ((vv - yl) / ((yh - yl) || 1)) * (bh - 8);
+      const g = mk('g'); g.appendChild(mk('rect', { x: bx, y: by, width: bw, height: bh, rx: 6, fill: 'var(--surface-solid)', stroke: 'var(--border)' }));
+      g.appendChild(mk('path', { d: xs.map((vv, k) => `${k ? 'L' : 'M'}${sx(vv)},${sy(ys[k])}`).join(' '), fill: 'none', stroke: color, 'stroke-width': 1.5 }));
+      if (expl) {
+        const xin = expl.node_values[e.layer][e.i];
+        const cx = Math.max(bx + 4, Math.min(bx + bw - 4, sx(xin))), cy = Math.max(by + 3, Math.min(by + bh - 3, sy(v)));
+        g.appendChild(mk('circle', { cx, cy, r: 3, fill: 'var(--text-primary)' }));
+      }
+      g.addEventListener('mousemove', (ev) => showTip(ev, `<code>φ(x) = ${e.expr}</code>`)); g.addEventListener('mouseleave', hideTip);
+      svg.appendChild(g);
+    }
+  });
+  for (let l = 0; l < cols; l++) for (let k = 0; k < L[l]; k++) {
+    const cx = colX(l), cy = nodeY(l, k), dead = deadHidden.has(`${l}-${k}`), out = l === cols - 1;
+    const r = out ? 20 : 13;
+    const fill = out && expl ? STATUS[expl.decision] : 'var(--surface-solid)';
+    svg.appendChild(mk('circle', { cx, cy, r: r + 5, fill: out ? 'var(--series-1)' : 'transparent', opacity: out ? 0.15 : 0 }));
+    svg.appendChild(mk('circle', { cx, cy, r, fill, stroke: dead ? 'var(--axis)' : 'var(--series-1)', 'stroke-width': 2, 'stroke-dasharray': dead ? '3 3' : '' }));
+    const val = expl ? expl.node_values[l][k] : null;
+    if (l === 0) {
+      svg.appendChild(mk('text', { class: 'kan-node-label', x: cx - r - 8, y: cy - 2, 'text-anchor': 'end' }, FEATURE_LABEL[net.feature_names[k]]));
+      if (val != null) svg.appendChild(mk('text', { class: 'kan-node-sub', x: cx - r - 8, y: cy + 12, 'text-anchor': 'end' }, val.toFixed(2)));
+    } else if (out) {
+      svg.appendChild(mk('text', { class: 'kan-node-label', x: cx + r + 10, y: cy - 2 }, 'Stop score'));
+      if (expl) svg.appendChild(mk('text', { class: 'kan-node-sub', x: cx + r + 10, y: cy + 12 }, expl.score.toFixed(1)));
+    } else {
+      svg.appendChild(mk('text', { class: 'kan-node-sub', x: cx, y: cy - r - 6, 'text-anchor': 'middle' }, dead ? 'pruned' : (val != null ? val.toFixed(1) : `h${k}`)));
+    }
+  }
+}
+
+function drawContrib(svg, expl, W, H) {
+  svg.innerHTML = '';
+  if (!expl) { svg.appendChild(mk('text', { class: 'axis-label', x: 12, y: 24 }, 'No decision yet')); return; }
+  const entries = FEATURES.map(f => [f, expl.contributions[f]]);
+  const maxAbs = Math.max(...entries.map(e => Math.abs(e[1])), 1);
+  const labW = 120, mid = labW + (W - labW - 50) / 2, half = (W - labW - 50) / 2, rowH = (H - 8) / entries.length;
+  svg.appendChild(mk('line', { class: 'axis-line', x1: mid, x2: mid, y1: 2, y2: H - 4 }));
+  entries.forEach(([f, v], k) => {
+    const y = 4 + k * rowH, w = Math.abs(v) / maxAbs * half;
+    svg.appendChild(mk('text', { class: 'axis-label', x: labW - 6, y: y + rowH / 2 + 3, 'text-anchor': 'end' }, FEATURE_LABEL[f]));
+    svg.appendChild(mk('rect', { x: v >= 0 ? mid : mid - w, y: y + 3, width: Math.max(1, w), height: rowH - 6, rx: 3, fill: v >= 0 ? 'var(--pos)' : 'var(--neg)' }));
+    svg.appendChild(mk('text', { class: 'axis-label', x: v >= 0 ? mid + w + 4 : mid - w - 4, y: y + rowH / 2 + 3, 'text-anchor': v >= 0 ? 'start' : 'end' }, `${v >= 0 ? '+' : ''}${v.toFixed(1)}`));
+  });
+}
+
+async function renderMiniKan(d) {
+  try { await loadNetwork(); } catch (e) { return; }
+  const expl = d && d.explanation;
+  drawNetwork($('mini-kan'), kanNet, expl, 520, 230, { padX: 150 });
+  drawContrib($('mini-contrib'), expl, 520, 120);
+}
+
+function drawGauge(score) {
+  const svg = $('kan-gauge'); svg.innerHTML = '';
+  const W = 300, x = (v) => 12 + v / 100 * (W - 24);
+  [[0, 40, 'var(--status-good)'], [40, 75, 'var(--status-warning)'], [75, 100, 'var(--status-critical)']].forEach(([a, b, c]) =>
+    svg.appendChild(mk('rect', { x: x(a), y: 10, width: x(b) - x(a) - 2, height: 12, rx: 4, fill: c, opacity: 0.85 })));
+  if (score != null) {
+    svg.appendChild(mk('path', { d: `M${x(score)},6 l-6,-6 h12 z`, fill: 'var(--text-primary)', transform: 'translate(0,4)' }));
+    svg.appendChild(mk('line', { x1: x(score), x2: x(score), y1: 8, y2: 26, stroke: 'var(--text-primary)', 'stroke-width': 2 }));
+  }
+  [0, 40, 75, 100].forEach(v => svg.appendChild(mk('text', { class: 'axis-label', x: x(v), y: 40, 'text-anchor': 'middle' }, v)));
+}
+
+function drawWaterfall(expl) {
+  const svg = $('kan-waterfall'); svg.innerHTML = '';
+  if (!expl) return;
+  const W = 640, H = 260, pad = { l: 44, r: 12, t: 14, b: 40 };
+  const SHORT = { loss_plateau_score: 'Plateau', gradient_trend: 'Gradient', lr_decay_benefit: 'LR-decay', gpu_hours_remaining_vs_budget: 'Budget', epochs_since_improvement: 'Since impr.' };
+  const steps = [['Baseline', expl.baseline, 'base']].concat(FEATURES.map(f => [SHORT[f], expl.contributions[f], 'delta'])).concat([['Score', expl.raw_output, 'total']]);
+  let run = 0; const bars = steps.map(([name, v, kind]) => {
+    if (kind === 'base') { run = v; return { name, a: 0, b: v, kind, v }; }
+    if (kind === 'total') return { name, a: 0, b: v, kind, v };
+    const a = run; run += v; return { name, a, b: run, kind, v };
+  });
+  const lo = Math.min(0, ...bars.map(b => Math.min(b.a, b.b))), hi = Math.max(100, ...bars.map(b => Math.max(b.a, b.b)));
+  const ph = H - pad.t - pad.b, bw = (W - pad.l - pad.r) / bars.length;
+  const y = (v) => pad.t + ph - (v - lo) / (hi - lo) * ph;
+  [0, 40, 75, 100].forEach(v => { svg.appendChild(mk('line', { class: 'grid-line', x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v) }));
+    svg.appendChild(mk('text', { class: 'axis-label', x: pad.l - 6, y: y(v) + 3, 'text-anchor': 'end' }, v)); });
+  bars.forEach((b, k) => {
+    const x = pad.l + k * bw + 6, top = y(Math.max(b.a, b.b)), h = Math.max(1, Math.abs(y(b.a) - y(b.b)));
+    const fill = b.kind === 'total' ? STATUS[expl.decision] : b.kind === 'base' ? 'var(--axis)' : (b.v >= 0 ? 'var(--pos)' : 'var(--neg)');
+    const r = mk('rect', { x, y: top, width: bw - 12, height: h, rx: 4, fill });
+    r.addEventListener('mousemove', (e) => showTip(e, `<b>${b.name}</b><br>${b.kind === 'delta' ? (b.v >= 0 ? '+' : '') : ''}${b.v.toFixed(2)}`)); r.addEventListener('mouseleave', hideTip);
+    svg.appendChild(r);
+    svg.appendChild(mk('text', { class: 'axis-label', x: x + (bw - 12) / 2, y: top - 4, 'text-anchor': 'middle' }, `${b.kind === 'delta' && b.v >= 0 ? '+' : ''}${b.v.toFixed(1)}`));
+    svg.appendChild(mk('text', { class: 'axis-label', x: x + (bw - 12) / 2, y: H - 22, 'text-anchor': 'middle' }, b.name));
+  });
+}
+
+function drawEdgeMultiples(net, expl) {
+  const root = $('kan-edges'); root.innerHTML = '';
+  net.edges.filter(e => e.active).sort((a, b) => b.importance - a.importance).forEach(e => {
+    const card = document.createElement('div'); card.className = 'sm-card';
+    const from = e.layer === 0 ? FEATURE_LABEL[net.feature_names[e.i]] : `hidden ${e.i}`;
+    const to = e.layer + 1 === net.layers.length - 1 ? 'score' : `hidden ${e.j}`;
+    card.innerHTML = `<div class="t">${from} → ${to}</div>`;
+    const svg = mk('svg', { viewBox: '0 0 180 70', class: 'chart', style: 'height:70px' });
+    const xs = e.curve.x, ys = e.curve.y, xl = xs[0], xh = xs[xs.length - 1], yl = Math.min(...ys), yh = Math.max(...ys);
+    const sx = (v) => 4 + (v - xl) / ((xh - xl) || 1) * 172, sy = (v) => 64 - (v - yl) / ((yh - yl) || 1) * 58;
+    svg.appendChild(mk('line', { class: 'grid-line', x1: 4, x2: 176, y1: 64, y2: 64 }));
+    svg.appendChild(mk('path', { d: xs.map((v, k) => `${k ? 'L' : 'M'}${sx(v)},${sy(ys[k])}`).join(' '), fill: 'none', stroke: 'var(--series-1)', 'stroke-width': 2 }));
+    if (expl) { const v = edgeValue(expl, e), xin = expl.node_values[e.layer][e.i];
+      svg.appendChild(mk('circle', { cx: Math.max(4, Math.min(176, sx(xin))), cy: Math.max(4, Math.min(66, sy(v))), r: 4, fill: 'var(--text-primary)' })); }
+    card.appendChild(svg);
+    const ex = document.createElement('div'); ex.className = 'e'; ex.textContent = `φ(x) = ${e.expr}`; card.appendChild(ex);
+    root.appendChild(card);
+  });
+}
+
+function buildSliders() {
+  const root = $('kan-sliders'); if (root.childElementCount) return;
+  FEATURES.forEach(f => {
+    const row = document.createElement('div'); row.className = 'slider-row';
+    row.innerHTML = `<label for="sl-${f}">${FEATURE_LABEL[f]}</label><input type="range" id="sl-${f}" min="0" max="1" step="0.01" value="${kanFeatures[f]}"><output id="out-${f}">${kanFeatures[f].toFixed(2)}</output>`;
+    root.appendChild(row);
+    row.querySelector('input').addEventListener('input', (e) => { kanFollowLive = false; kanFeatures[f] = +e.target.value; $(`out-${f}`).textContent = (+e.target.value).toFixed(2); scheduleExplain(); });
+  });
+}
+function setKanFeatures(features) {
+  FEATURES.forEach(f => { kanFeatures[f] = features[f]; const s = $(`sl-${f}`); if (s) { s.value = features[f]; $(`out-${f}`).textContent = features[f].toFixed(2); } });
+  scheduleExplain(0);
+}
+let explainTimer = null;
+function scheduleExplain(delay = 120) { clearTimeout(explainTimer); explainTimer = setTimeout(runExplain, delay); }
+async function runExplain() {
+  const res = await fetch(`${API_BASE}/api/gate/explain`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ features: kanFeatures }) });
+  kanExpl = await res.json(); paintKan();
+}
+function paintKan() {
+  if (!kanNet) return;
+  drawNetwork($('kan-net'), kanNet, kanExpl, 760, 520, { sparklines: true, padX: 140 });
+  $('kan-score').textContent = kanExpl ? kanExpl.score.toFixed(1) : '—';
+  $('kan-decision').innerHTML = kanExpl ? badge(kanExpl.decision) : '';
+  drawGauge(kanExpl ? kanExpl.score : null); drawWaterfall(kanExpl); drawEdgeMultiples(kanNet, kanExpl);
+  $('kan-additive').textContent = kanExpl ? (kanExpl.additive
+    ? `Exact: baseline ${kanExpl.baseline.toFixed(1)} plus the five contributions equals the gate's output ${kanExpl.raw_output.toFixed(1)}, because every layer after the first is linear.`
+    : 'Contributions are occlusion estimates; this gate is not purely additive.') : '';
+}
+async function renderKanView() {
+  buildSliders();
+  try { await loadNetwork(); } catch (e) { $('kan-formula').textContent = 'Could not load the gate - is the backend running?'; return; }
+  const last = live.decisions[live.decisions.length - 1];
+  if (last && kanFollowLive) setKanFeatures(last.features); else scheduleExplain(0);
+}
+$('kan-load-latest').addEventListener('click', () => { kanFollowLive = true; const last = live.decisions[live.decisions.length - 1]; if (last) setKanFeatures(last.features); });
+function fillDecisionPicker() {
+  const p = $('kan-decision-picker'); const cur = p.value;
+  p.innerHTML = '<option value="">Replay a past decision…</option>' + live.decisions.map((d, k) =>
+    `<option value="${k}">${d.run || ''} epoch ${d.epoch_index + 1}: ${decisionLabel(d.decision)} (${d.gate_score.toFixed(0)})</option>`).join('');
+  p.value = cur;
+}
+$('kan-decision-picker').addEventListener('change', (e) => { if (e.target.value === '') return; kanFollowLive = false; setKanFeatures(live.decisions[+e.target.value].features); });
+
+/* ================= RESEARCH ================= */
+let research = null;
+async function loadResearch() {
+  if (research) return renderResearch();
+  try { research = await (await fetch(`${API_BASE}/api/research/results`)).json(); } catch (e) { research = { available: false }; }
+  renderResearch();
+}
+const OURS = 'KAN (hindsight labels, ours)';
+function m(s, k) { return s[k].mean; }
+function pm(s, k, dp = 1) { return `${s[k].mean.toFixed(dp)}<span style="color:var(--text-muted)"> ± ${s[k].std.toFixed(dp)}</span>`; }
+function renderResearch() {
+  const root = $('research-root');
+  if (!research.available) {
+    root.innerHTML = `<div class="panel"><div class="empty-state">No benchmark results yet. Run<br><code>python -m experiments.collect_curves</code> then <code>python -m experiments.benchmark</code></div></div>`;
+    return;
+  }
+  const r = research, cfg = r.config;
+  const pol = r.policies.slice().sort((a, b) => m(b.summary, 'compute_saved_pct') - m(a.summary, 'compute_saved_pct'));
+  const ours = pol.find(p => p.name === OURS), pat = pol.find(p => p.name === 'Patience-5');
+  root.innerHTML = `
+    <div class="panel"><div class="panel-h"><h2>Offline benchmark on real learning curves</h2>
+      <span class="hint">${cfg.n_runs} real Fashion-MNIST runs, ${cfg.lrs.length} learning rates × ${cfg.batch_sizes.length} batch sizes × ${cfg.seeds.length} seeds, ${cfg.budget_epochs}-epoch budget, 3-fold CV grouped by seed</span></div>
+      <div class="stat-row">
+        <div class="stat-tile"><div class="label">Compute saved (ours)</div><div class="value">${m(ours.summary, 'compute_saved_pct').toFixed(1)}%</div><div class="sub">Patience-5: ${m(pat.summary, 'compute_saved_pct').toFixed(1)}%</div></div>
+        <div class="stat-tile"><div class="label">Mean regret (ours)</div><div class="value">${m(ours.summary, 'mean_regret_pct').toFixed(2)}%</div><div class="sub">Patience-5: ${m(pat.summary, 'mean_regret_pct').toFixed(2)}%</div></div>
+        <div class="stat-tile"><div class="label">Premature stops (ours)</div><div class="value">${m(ours.summary, 'premature_rate_pct').toFixed(1)}%</div><div class="sub">regret above ${(100 * cfg.regret_fail).toFixed(0)}%</div></div>
+        <div class="stat-tile"><div class="label">Formula faithfulness</div><div class="value">${r.interpretability[OURS].faithfulness_max_abs.mean.toExponential(1)}</div><div class="sub">max |formula − model|, score units</div></div>
+      </div></div>
+    <div class="grid">
+      <div class="panel span-6"><div class="panel-h"><h2>Compute saved vs regret</h2><span class="hint">Lower-right is better</span></div>
+        <svg class="chart" id="pareto" viewBox="0 0 640 340" style="height:340px"></svg></div>
+      <div class="panel span-6"><div class="panel-h"><h2>Per-run results</h2><span class="hint">Mean ± std over 3 gate seeds</span></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Policy</th><th class="num">Saved %</th><th class="num">Mean regret %</th><th class="num">P90 regret %</th><th class="num">Premature %</th></tr></thead>
+        <tbody>${pol.map(p => `<tr class="${p.name === OURS ? 'ours' : ''}"><td>${p.name}</td><td class="num">${pm(p.summary, 'compute_saved_pct')}</td><td class="num">${pm(p.summary, 'mean_regret_pct', 2)}</td><td class="num">${pm(p.summary, 'p90_regret_pct', 2)}</td><td class="num">${pm(p.summary, 'premature_rate_pct')}</td></tr>`).join('')}</tbody></table></div></div>
+    </div>
+    <div class="panel"><div class="panel-h"><h2>Example held-out runs</h2><span class="hint">Validation loss with where each policy stopped</span></div>
+      <div class="small-multiples" id="examples" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))"></div></div>`;
+  drawPareto(pol); drawExamples(r.examples);
+}
+function drawPareto(pol) {
+  const svg = $('pareto'), W = 640, H = 340, pad = { l: 52, r: 16, t: 14, b: 40 };
+  const pts = pol.map(p => ({ name: p.name, x: m(p.summary, 'compute_saved_pct'), y: m(p.summary, 'mean_regret_pct') }));
+  // log-style regret axis: the median rule's per-run regret is two orders above the rest
+  const tr = (v) => Math.log10(1 + 10 * Math.max(0, v));
+  const xh = Math.max(...pts.map(p => p.x), 10) * 1.1, yh = tr(Math.max(...pts.map(p => p.y), 1) * 1.3);
+  const x = (v) => pad.l + v / xh * (W - pad.l - pad.r), y = (v) => H - pad.b - tr(v) / yh * (H - pad.t - pad.b);
+  [0, 0.25, 0.5, 1, 2, 5, 10, 40].filter(v => tr(v) <= yh).forEach(vy => {
+    svg.appendChild(mk('line', { class: 'grid-line', x1: pad.l, x2: W - pad.r, y1: y(vy), y2: y(vy) }));
+    svg.appendChild(mk('text', { class: 'axis-label', x: pad.l - 6, y: y(vy) + 3, 'text-anchor': 'end' }, `${vy}%`)); });
+  for (let k = 0; k <= 4; k++) { const vx = xh * k / 4;
+    svg.appendChild(mk('text', { class: 'axis-label', x: x(vx), y: H - pad.b + 14, 'text-anchor': 'middle' }, `${vx.toFixed(0)}%`)); }
+  svg.appendChild(mk('text', { class: 'axis-label', x: W - pad.r, y: H - 6, 'text-anchor': 'end' }, 'compute saved →'));
+  svg.appendChild(mk('text', { class: 'axis-label', x: pad.l, y: pad.t - 2 }, '↑ mean regret (lower is better)'));
+  pts.forEach(p => {
+    const ours = p.name === OURS;
+    const c = mk('circle', { cx: x(p.x), cy: y(p.y), r: ours ? 9 : 6, fill: ours ? 'var(--series-1)' : 'var(--text-muted)', stroke: 'var(--surface-solid)', 'stroke-width': 2 });
+    c.addEventListener('mousemove', (e) => showTip(e, `<b>${p.name}</b><br>saved ${p.x.toFixed(1)}%, regret ${p.y.toFixed(2)}%`)); c.addEventListener('mouseleave', hideTip);
+    svg.appendChild(c);
+    if (ours || /Patience-5|Median|oracle|KAN \(teacher/.test(p.name))
+      svg.appendChild(mk('text', { class: 'axis-label', x: x(p.x) + 11, y: y(p.y) + 4, fill: 'var(--text-secondary)' }, p.name.replace(' (hindsight labels, ours)', ' (ours)')));
+  });
+}
+function drawExamples(examples) {
+  const root = $('examples');
+  const pick = examples.filter(e => e.seed === examples[0].seed).filter((e, k, a) => [0, Math.floor(a.length / 2), a.length - 1, 3, 7, 9].includes(k)).slice(0, 6);
+  const marks = { 'KAN (hindsight labels, ours)': ['var(--series-1)', 'KAN (ours)'], 'Patience-5': ['var(--series-2)', 'Patience-5'], 'Hindsight oracle': ['var(--series-3)', 'Oracle'] };
+  pick.forEach(ex => {
+    const card = document.createElement('div'); card.className = 'sm-card';
+    card.innerHTML = `<div class="t">lr ${ex.lr}, batch ${ex.batch_size}, seed ${ex.seed}</div>`;
+    const svg = mk('svg', { viewBox: '0 0 280 120', class: 'chart', style: 'height:120px' });
+    const v = ex.val_loss, lo = Math.min(...v), hi = Math.max(...v), n = v.length;
+    const sx = (i) => 6 + i / (n - 1) * 268, sy = (val) => 110 - (val - lo) / ((hi - lo) || 1) * 100;
+    svg.appendChild(mk('path', { d: v.map((val, i) => `${i ? 'L' : 'M'}${sx(i)},${sy(val)}`).join(' '), fill: 'none', stroke: 'var(--text-secondary)', 'stroke-width': 1.5 }));
+    Object.entries(marks).forEach(([k, [c]], idx) => { const t = ex.stops[k] - 1;
+      svg.appendChild(mk('line', { x1: sx(t), x2: sx(t), y1: 6 + idx * 3, y2: 112, stroke: c, 'stroke-width': 2, 'stroke-dasharray': '4 3' })); });
+    card.appendChild(svg);
+    const lg = document.createElement('div'); lg.className = 'legend';
+    lg.innerHTML = Object.entries(marks).map(([k, [c, lbl]]) => `<span class="legend-item"><span class="legend-line" style="background:${c}"></span>${lbl} @${ex.stops[k]}</span>`).join('');
+    card.appendChild(lg); root.appendChild(card);
+  });
+}
+
+function redrawAll() { drawLossChart(); drawHwChart(); renderMiniKan(live.decisions[live.decisions.length - 1]); if (kanNet && kanExpl) paintKan(); if (research && research.available && $('research-view').classList.contains('active')) renderResearch(); }
+
+async function loadGpuOptions() {
+  try {
+    const hw = await (await fetch(`${API_BASE}/api/hardware`)).json();
+    renderHardware(hw);
+    if (!hw.gpu_available || hw.gpus.length < 2) return;
+    hw.gpus.forEach(g => { const o = document.createElement('option'); o.value = g.index; o.textContent = `[${g.index}] ${g.name}`; $('live-gpu-select').appendChild(o); });
+  } catch (e) { }
+}
+renderPipeline(null); connectLiveSocket(); loadGpuOptions(); renderMiniKan(null);
 </script>
 </body>
 </html>

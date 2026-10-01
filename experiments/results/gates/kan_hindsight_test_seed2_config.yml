@@ -1,0 +1,44 @@
+affine_trainable: false
+auto_save: true
+base_fun_name: silu
+ckpt_path: /home/user/KAN-KubeAgent/kan_gate/checkpoints/_tmp
+device: cpu
+grid: 5
+grid_eps: 0.02
+grid_range:
+- -1
+- 1
+k: 3
+mult_arity: 2
+round: 0
+sb_trainable: true
+sp_trainable: true
+state_id: 3
+symbolic.funs_name.0:
+- - '0'
+  - x
+  - sin
+  - x
+  - x
+- - x
+  - x
+  - sin
+  - x
+  - x
+- - x
+  - x
+  - x
+  - x
+  - x
+symbolic.funs_name.1:
+- - x
+  - x
+  - x
+symbolic_enabled: true
+width:
+- - 5
+  - 0
+- - 3
+  - 0
+- - 1
+  - 0

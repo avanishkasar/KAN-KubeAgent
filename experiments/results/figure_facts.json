@@ -1,0 +1,24 @@
+{
+ "deployed_formula": "stop_score = 11.3298914795876*epochs_since_improvement + 1.59665356675302*gradient_trend + 5.46098108223035*loss_plateau_score + 17.3780394041045*sin(4.35648012161255*gpu_hours_remaining_vs_budget + 8.71568012237549) + 6.1972306219775*sin(4.76167964935303*loss_plateau_score - 1.76247990131378) - 1.58814137985223*sin(5.9890398979187*lr_decay_benefit + 2.40207982063293) - 36.8310699462891*sin(1.58974183044919*epochs_since_improvement + 2.19613645923884*gpu_hours_remaining_vs_budget - 3.47327449564284*gradient_trend + 1.73486569655719*loss_plateau_score + 0.660453344067136*sin(8.95592021942139*lr_decay_benefit - 6.19360017776489) - 9.73320278383406) + 56.0142462240196",
+ "deployed_layers": [
+  5,
+  3,
+  1
+ ],
+ "deployed_active_edges": 15,
+ "contrib_example": {
+  "run_id": "lr0.001_bs64_s0",
+  "epochs_seen": 34,
+  "baseline": 51.08742904663086,
+  "contributions": {
+   "loss_plateau_score": 68.2757568359375,
+   "gradient_trend": 7.907722473144531,
+   "lr_decay_benefit": -2.6735687255859375,
+   "gpu_hours_remaining_vs_budget": -2.029571533203125,
+   "epochs_since_improvement": 31.848045349121094
+  },
+  "raw_output": 100.36567687988281,
+  "decision": "early_stop",
+  "additive": false
+ }
+}

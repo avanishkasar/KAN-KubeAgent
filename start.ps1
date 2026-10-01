@@ -49,8 +49,8 @@ if ($hasNvidiaSmi) {
 }
 
 if (-not (Test-Path "kan_gate\checkpoints\kan_gate_config.yml")) {
-    Write-Host "No KAN gate checkpoint found - training one on synthetic data (fast, one-time)..."
-    & $VenvPython -m kan_gate.train --synthetic --steps 250
+    Write-Host "No KAN gate checkpoint found - training one on the bundled real learning curves (one-time)..."
+    & $VenvPython -m kan_gate.train --curves experiments\data\curves.jsonl
 }
 
 Write-Host "Starting dashboard server in the background (survives this window closing)..."

@@ -62,7 +62,25 @@ CONTINUE    ADJUST LR      EARLY-STOP
 (no-op)   (patch TrainJob) (stop + free GPU)
 ```
 
-Two run modes are available from the dashboard: Live, which drives a real training subprocess with real CPU/GPU telemetry, and Mock/Synthetic, which scores an instantly generated synthetic curve for fast iteration on the gate itself.
+The dashboard has four views: Live (a real training subprocess with real CPU/GPU telemetry, the agent pipeline lighting up node by node, and every gate decision traced through the network), KAN Network (the gate's learned edge functions, what-if sliders, and an exact per-feature breakdown of each score), Research (the benchmark results), and Mock/Synthetic (an instantly generated synthetic curve for fast iteration).
+
+## Hindsight-supervised gate
+
+The gate is trained on hindsight labels: for each decision point of a completed real run, the target stop score is computed from how much validation-loss improvement was actually still to come (kan_gate/hindsight.py). This replaces the original setup, in which the gate imitated a hand-written three-rule policy and harvested live runs were labelled with the gate's own decisions, a circular loop that could only teach the gate to copy itself.
+
+After training, every edge of the KAN is fixed to a symbolic function, so the formula shown in the dashboard is the function that makes the decision, not an approximation of it.
+
+## Experiments and paper
+
+```
+python -m experiments.collect_curves      # 36 real Fashion-MNIST runs, full learning curves
+python -m experiments.benchmark           # offline replay of every stopping policy, 3-fold CV by seed
+python -m experiments.closed_loop         # the full agent + gate system controlling real runs
+python -m experiments.figures             # paper figures from the results above
+python -m kan_gate.train --curves experiments/data/curves.jsonl   # train the deployed gate
+```
+
+Results land in experiments/results/. The paper (IEEE conference format) is in paper/, with its PDF at paper/kan_kubeagent.pdf.
 
 ## Repository structure
 
@@ -78,11 +96,13 @@ KAN-KubeAgent/
     notes/
       weekly_log.md            research progress log
 
-  kan_gate/                    KAN gating module (pykan-based)
+  kan_gate/                    KAN gating module (pykan-based), hindsight labels, introspection
   agents/                      LangGraph agent layer
   k8s/                         Minikube + Kubeflow Trainer setup
   training/                    the real training workload the agents control
-  dashboard/                   live decision dashboard (Live + Mock/Synthetic modes)
+  dashboard/                   control-room dashboard (Live, KAN Network, Research, Mock)
+  experiments/                 curve collection, benchmark, closed-loop runs, figures
+  paper/                       research paper (LaTeX, IEEE format) and PDF
   datasets/                    dataset documentation
 
   references/

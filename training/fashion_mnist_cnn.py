@@ -31,8 +31,16 @@ import sys
 import time
 
 
-def log_metric(epoch: int, loss: float, grad_norm: float, lr: float) -> None:
-    print(json.dumps({"epoch": epoch, "loss": loss, "grad_norm": grad_norm, "lr": lr}), flush=True)
+def log_metric(epoch: int, loss: float, grad_norm: float, lr: float,
+               val_loss: float | None = None, val_acc: float | None = None,
+               epoch_seconds: float | None = None) -> None:
+    entry = {"epoch": epoch, "loss": loss, "grad_norm": grad_norm, "lr": lr}
+    if val_loss is not None:
+        entry["val_loss"] = val_loss
+        entry["val_acc"] = val_acc
+    if epoch_seconds is not None:
+        entry["epoch_seconds"] = epoch_seconds
+    print(json.dumps(entry), flush=True)
 
 
 def log_event(message: str) -> None:
@@ -85,6 +93,17 @@ def _load_dataset(subset_size: int, data_root: str):
     return subset
 
 
+def _load_val_dataset(val_size: int, data_root: str):
+    """Held-out validation images from Fashion-MNIST's official test split,
+    so the monitored loss is never computed on training images."""
+    from torch.utils.data import Subset
+    from torchvision import datasets, transforms
+
+    full_test = datasets.FashionMNIST(root=data_root, train=False, download=True,
+                                      transform=transforms.Compose([transforms.ToTensor()]))
+    return Subset(full_test, range(min(val_size, len(full_test))))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--epochs", type=int, default=30)
@@ -110,6 +129,11 @@ def main():
                          help="Sleep this many milliseconds after every batch. 0 = no "
                               "throttle. Background mode uses a small value to trade some "
                               "throughput for a visibly low, predictable CPU/GPU load.")
+    parser.add_argument("--val-size", type=int, default=2000,
+                         help="Images from the official test split used for per-epoch "
+                              "validation loss/accuracy. 0 disables validation.")
+    parser.add_argument("--seed", type=int, default=None,
+                         help="Seed torch's RNG (weights init + shuffling) for reproducible runs.")
     args = parser.parse_args()
 
     try:
@@ -124,6 +148,8 @@ def main():
     if args.cpu_threads > 0:
         torch.set_num_threads(args.cpu_threads)
         log_event(f"Capped torch CPU threads to {args.cpu_threads} (background mode)")
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
 
     class SmallCNN(nn.Module):
         def __init__(self):
@@ -153,6 +179,7 @@ def main():
 
     try:
         dataset = _load_dataset(args.subset_size, args.data_root)
+        val_dataset = _load_val_dataset(args.val_size, args.data_root) if args.val_size > 0 else None
     except Exception as exc:
         log_event(
             f"FATAL: could not load real Fashion-MNIST ({exc.__class__.__name__}: {exc}). "
@@ -163,6 +190,20 @@ def main():
 
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,
                          num_workers=args.workers, persistent_workers=args.workers > 0)
+    val_loader = DataLoader(val_dataset, batch_size=512) if val_dataset is not None else None
+
+    def evaluate():
+        model.eval()
+        total, correct, loss_sum = 0, 0, 0.0
+        with torch.no_grad():
+            for images, labels in val_loader:
+                images, labels = images.to(device), labels.to(device)
+                out = model(images)
+                loss_sum += F.cross_entropy(out, labels, reduction="sum").item()
+                correct += (out.argmax(1) == labels).sum().item()
+                total += labels.numel()
+        model.train()
+        return loss_sum / total, correct / total
 
     model = SmallCNN().to(device)
     lr = args.lr
@@ -185,6 +226,7 @@ def main():
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
+        epoch_start = time.perf_counter()
         total_loss = 0.0
         total_grad_norm = 0.0
         n_batches = 0
@@ -195,7 +237,11 @@ def main():
                 output = model(images)
                 loss = F.cross_entropy(output, labels)
             scaler.scale(loss).backward()
-            grad_norm = sum(p.grad.norm().item() for p in model.parameters() if p.grad is not None)
+            # Global L2 norm of the true (unscaled) gradient - under AMP the
+            # raw .grad values are multiplied by the loss scale.
+            scaler.unscale_(optimizer)
+            grad_norm = torch.sqrt(sum(p.grad.pow(2).sum() for p in model.parameters()
+                                       if p.grad is not None)).item()
             scaler.step(optimizer)
             scaler.update()
 
@@ -206,7 +252,10 @@ def main():
             if args.throttle_ms > 0:
                 time.sleep(args.throttle_ms / 1000)
 
-        log_metric(epoch, total_loss / n_batches, total_grad_norm / n_batches, lr)
+        val_loss, val_acc = evaluate() if val_loader is not None else (None, None)
+        log_metric(epoch, total_loss / n_batches, total_grad_norm / n_batches, lr,
+                   val_loss=val_loss, val_acc=val_acc,
+                   epoch_seconds=time.perf_counter() - epoch_start)
 
     log_event("Training complete")
 

@@ -46,6 +46,8 @@ class _RunningJob:
     lr_override_path: Path
     losses: list[float] = field(default_factory=list)
     grad_norms: list[float] = field(default_factory=list)
+    val_losses: list[float] = field(default_factory=list)
+    val_accs: list[float] = field(default_factory=list)
     lr: float = 2e-4
     events: list[str] = field(default_factory=list)
     _events_read_index: int = 0
@@ -69,7 +71,7 @@ class LocalProcessTrainJobClient:
     def create(self, name: str, epochs: int = 30, lr: float = 2e-4,
                batch_size: int = 128, subset_size: int = 6000,
                gpu_hours_budget: float = 10.0, mode: str = "normal",
-               gpu_index: int | None = None) -> TrainJobStatus:
+               gpu_index: int | None = None, seed: int | None = None) -> TrainJobStatus:
         if mode not in _MODE_TRAINING_ARGS:
             raise ValueError(f"Unknown mode: {mode!r}, expected one of {tuple(_MODE_TRAINING_ARGS)}")
         mode_args = _MODE_TRAINING_ARGS[mode]
@@ -91,6 +93,8 @@ class LocalProcessTrainJobClient:
                "--throttle-ms", str(mode_args["throttle_ms"])]
         if mode_args["amp"]:
             cmd.append("--amp")
+        if seed is not None:
+            cmd += ["--seed", str(seed)]
 
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
@@ -123,6 +127,9 @@ class LocalProcessTrainJobClient:
                     job.losses.append(entry["loss"])
                     job.grad_norms.append(entry["grad_norm"])
                     job.lr = entry["lr"]
+                    if "val_loss" in entry:
+                        job.val_losses.append(entry["val_loss"])
+                        job.val_accs.append(entry["val_acc"])
 
     def get_status(self, name: str) -> TrainJobStatus:
         job = self._jobs[name]
@@ -133,6 +140,7 @@ class LocalProcessTrainJobClient:
                 loss_history=list(job.losses), grad_norm_history=list(job.grad_norms),
                 lr=job.lr, gpu_hours_used=gpu_hours_used, gpu_hours_budget=job.gpu_hours_budget,
                 phase=job.phase(),
+                val_loss_history=list(job.val_losses), val_acc_history=list(job.val_accs),
             )
 
     def get_new_events(self, name: str) -> list[str]:

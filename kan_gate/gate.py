@@ -143,7 +143,7 @@ class KANGate:
         from kan import KAN
 
         gate = cls.__new__(cls)
-        gate.width = width or [len(FEATURE_NAMES), 4, 3, 1]
         gate.model = KAN.loadckpt(str(path))
+        gate.width = width or [w[0] if isinstance(w, list) else w for w in gate.model.width]
         gate._formula_cache = None
         return gate

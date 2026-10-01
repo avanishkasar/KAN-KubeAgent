@@ -31,10 +31,17 @@ class TrainJobStatus:
     gpu_hours_used: float
     gpu_hours_budget: float
     phase: str = "Running"  # Running | Stopped | Completed
+    val_loss_history: list[float] = field(default_factory=list)
+    val_acc_history: list[float] = field(default_factory=list)
 
     def to_history(self, window: int = 5) -> TrainingHistory:
+        # Monitor held-out loss when the job reports it - early stopping on
+        # training loss can't see overfitting.
+        monitored = (self.val_loss_history
+                     if len(self.val_loss_history) == len(self.loss_history) and self.val_loss_history
+                     else self.loss_history)
         return TrainingHistory(
-            loss_history=self.loss_history,
+            loss_history=monitored,
             grad_norm_history=self.grad_norm_history,
             lr=self.lr,
             gpu_hours_used=self.gpu_hours_used,

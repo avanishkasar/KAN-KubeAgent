@@ -19,7 +19,11 @@ FEATURE_NAMES = [
 
 @dataclass
 class TrainingHistory:
-    """Minimal view of a TrainJob's progress needed to score a decision."""
+    """Minimal view of a TrainJob's progress needed to score a decision.
+
+    `loss_history` is the *monitored* loss: validation loss when the job
+    reports it, training loss otherwise (see TrainJobStatus.to_history).
+    """
 
     loss_history: list[float]
     grad_norm_history: list[float] = field(default_factory=list)
@@ -44,14 +48,22 @@ def _plateau_score(losses: list[float], window: int) -> float:
 
 
 def _gradient_trend(grad_norms: list[float], window: int) -> float:
-    """0 (gradient shrinking / near-converged) .. 1 (still moving a lot)."""
+    """0 (gradient shrunk to nothing) .. 1 (as large as it has ever been).
+
+    Recent mean gradient norm relative to the largest seen so far in this
+    run. Normalising by the run's own peak keeps the feature scale-free:
+    raw gradient norms differ by orders of magnitude between models (a
+    small CNN's global norm is typically 2-5, which an absolute clip to
+    [0, 1] would saturate at 1 for the whole run).
+    """
     if not grad_norms:
         return 0.0
+    peak = max(grad_norms)
+    if peak <= 0:
+        return 0.0
     recent = grad_norms[-window:]
-    if len(recent) < 2:
-        return min(1.0, recent[-1])
     avg = sum(recent) / len(recent)
-    return max(0.0, min(1.0, avg))
+    return max(0.0, min(1.0, avg / peak))
 
 
 def _lr_decay_benefit(losses: list[float], window: int) -> float:
