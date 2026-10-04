@@ -9,9 +9,9 @@
     color-scheme: dark;
     --bg: #0a0a0a; --surface-1: #141414; --surface-2: #1b1b1b; --surface-solid: #141414;
     --border: #2e2e2e; --text-primary: #f2f2f2; --text-secondary: #bdbdbd; --text-muted: #8a8a8a;
-    --grid: #262626; --axis: #3d3d3d;
-    --series-1: #f2f2f2; --series-2: #9a9a9a; --series-3: #646464; --accent-2: #bdbdbd;
-    --pos: #f2f2f2; --neg: #7a7a7a;
+    --grid: #262626; --axis: #3d3d3d; --panel-top: #1e1e1e;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --accent-2: #9085e9;
+    --pos: #3987e5; --neg: #e66767;
     --status-good: #3fb950; --status-warning: #d4a72c; --status-serious: #ec835a; --status-critical: #e5534b;
     --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -21,30 +21,32 @@
     color-scheme: light;
     --bg: #ececec; --surface-1: #fafafa; --surface-2: #ffffff; --surface-solid: #fafafa;
     --border: #d4d4d4; --text-primary: #111; --text-secondary: #444; --text-muted: #777;
-    --grid: #e4e4e4; --axis: #bbb;
-    --series-1: #111; --series-2: #6e6e6e; --series-3: #aaa; --accent-2: #444;
-    --pos: #111; --neg: #9a9a9a;
+    --grid: #e4e4e4; --axis: #bbb; --panel-top: #ffffff;
+    --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --accent-2: #4a3aa7;
+    --pos: #2a78d6; --neg: #e34948;
     --status-good: #1a7f37; --status-warning: #9a6700; --status-critical: #cf222e;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: var(--sans); color: var(--text-primary); background: linear-gradient(180deg, #202020 0%, var(--bg) 340px); background-color: var(--bg); min-height: 100vh; padding: 0 16px 64px; }
-  :root[data-theme="light"] body { background: linear-gradient(180deg, #d9d9d9 0%, var(--bg) 340px); background-color: var(--bg); }
+  body { margin: 0; font-family: var(--sans); color: var(--text-primary); background: var(--bg); min-height: 100vh; padding: 0 16px 64px; }
   .wrap { max-width: 1320px; margin: 0 auto; }
 
   /* ---------- top bar ---------- */
-  .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    padding: 14px 0; margin-bottom: 14px; background: var(--bg);
-    border-bottom: 1px solid var(--border); }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 14px;
+  .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px;
+    padding: 16px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  @media (max-width: 1180px) { .topbar { grid-template-columns: 1fr; justify-items: start; } .chips { justify-content: flex-start !important; } }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand > div:last-child { min-width: 0; }
+  .brand p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .logo { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 14px;
     background: linear-gradient(135deg, #5a5a5a, #1f1f1f); color: #fff; border: 1px solid var(--border); }
   .brand h1 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
   .brand h1 span { font-weight: 700; }
   .brand p { margin: 2px 0 0; font-size: 11.5px; color: var(--text-muted); }
-  .tabs { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; margin: 0 auto; }
-  .tabs button { border: 0; background: transparent; color: var(--text-secondary); font: 600 13px var(--sans); padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+  .tabs { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; flex-wrap: nowrap; }
+  .tabs button { white-space: nowrap; border: 0; background: transparent; color: var(--text-secondary); font: 600 13px var(--sans); padding: 8px 16px; border-radius: 999px; cursor: pointer; }
   .tabs button.active { background: var(--text-primary); color: var(--bg); }
-  .chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .chip.gpu-chip { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
   .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary); padding: 5px 10px;
     border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); white-space: nowrap; }
   .chip .led { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
@@ -61,7 +63,7 @@
   .span-5 { grid-column: span 5; } .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-3 { grid-column: span 3; }
   @media (max-width: 980px) { .span-8, .span-7, .span-5, .span-4, .span-6, .span-3 { grid-column: span 12; } }
 
-  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 14px;
+  .panel { background: linear-gradient(180deg, var(--panel-top) 0%, var(--surface-1) 160px); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 14px;
     }
   .grid > .panel { margin-bottom: 0; }
   .panel-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
@@ -79,6 +81,7 @@
     padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer; }
   form.controls button:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
   form.controls button.stop-btn { background: transparent; color: var(--text-primary); border: 1px solid var(--text-muted); }
+  form.controls input[type=checkbox] { width: 16px; height: 16px; padding: 0; }
   .toggle-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); padding-bottom: 8px; }
   form.controls .toggle-row label { flex-direction: row; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--text-secondary); }
 
@@ -219,7 +222,7 @@
     <div class="chips">
       <span class="chip"><span class="led" id="chip-led"></span><span id="chip-phase">Idle</span></span>
       <span class="chip" id="chip-cpu">CPU</span>
-      <span class="chip" id="chip-gpu">GPU</span>
+      <span class="chip gpu-chip" id="chip-gpu">GPU</span>
       <button class="icon-btn" id="theme-toggle" type="button">Theme</button>
     </div>
   </header>
@@ -241,23 +244,24 @@
             <option value="background">Background (low, capped)</option>
             <option value="normal" selected>Normal</option>
             <option value="turbo">Turbo (max throughput)</option></select></label>
-        <label>GPU<select name="gpu_index" id="live-gpu-select"><option value="">Auto</option></select></label>
+        <label>Train on<select name="gpu_index" id="live-gpu-select"><option value="">Auto (GPU if available)</option><option value="-1">CPU only</option></select></label>
         <div class="toggle-row"><input type="checkbox" id="live-auto"><label for="live-auto">Auto-continuous</label></div>
         <button type="submit" id="live-start-btn">Start real training</button>
         <button type="button" id="live-stop-btn" class="stop-btn" disabled>Stop</button>
       </form>
+      <p class="note" id="gpu-notice" style="display:none"></p>
     </div>
 
     <div class="panel">
       <div class="stat-row">
         <div class="stat-tile"><div class="label">Status</div><div class="value" id="live-stat-phase"><span class="badge idle"><span class="dot"></span>Idle</span></div></div>
-        <div class="stat-tile"><div class="label">Epoch (this run)</div><div class="value" id="live-stat-epoch">—</div><div class="sub" id="live-stat-lr"></div></div>
-        <div class="stat-tile"><div class="label">Val accuracy</div><div class="value" id="live-stat-acc">—</div><div class="sub" id="live-stat-bestloss"></div></div>
-        <div class="stat-tile"><div class="label">Auto run #</div><div class="value" id="live-stat-run">—</div><div class="sub" id="live-stat-total-epochs"></div></div>
-        <div class="stat-tile"><div class="label">CPU</div><div class="value" id="live-stat-cpu">—</div><div class="bar-track"><div class="bar-fill" id="live-stat-cpu-bar" style="width:0%;background:var(--series-1)"></div></div></div>
-        <div class="stat-tile"><div class="label">Memory</div><div class="value" id="live-stat-mem">—</div><div class="bar-track"><div class="bar-fill" id="live-stat-mem-bar" style="width:0%;background:var(--series-2)"></div></div></div>
-        <div class="stat-tile" id="live-stat-gpu-tile"><div class="label">GPU</div><div class="value" id="live-stat-gpu">—</div><div class="bar-track"><div class="bar-fill" id="live-stat-gpu-bar" style="width:0%;background:var(--series-3)"></div></div></div>
-        <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="live-stat-decision">—</div><div class="sub" id="live-stat-counts"></div></div>
+        <div class="stat-tile"><div class="label">Epoch</div><div class="value" id="live-stat-epoch">0</div><div class="sub" id="live-stat-lr"></div></div>
+        <div class="stat-tile"><div class="label">Val accuracy</div><div class="value" id="live-stat-acc">n/a</div><div class="sub" id="live-stat-bestloss"></div></div>
+        <div class="stat-tile"><div class="label">Auto run #</div><div class="value" id="live-stat-run">n/a</div><div class="sub" id="live-stat-total-epochs"></div></div>
+        <div class="stat-tile"><div class="label">CPU</div><div class="value" id="live-stat-cpu">n/a</div><div class="bar-track"><div class="bar-fill" id="live-stat-cpu-bar" style="width:0%;background:var(--series-1)"></div></div></div>
+        <div class="stat-tile"><div class="label">Memory</div><div class="value" id="live-stat-mem">n/a</div><div class="bar-track"><div class="bar-fill" id="live-stat-mem-bar" style="width:0%;background:var(--series-2)"></div></div></div>
+        <div class="stat-tile" id="live-stat-gpu-tile"><div class="label">GPU</div><div class="value" id="live-stat-gpu">n/a</div><div class="bar-track"><div class="bar-fill" id="live-stat-gpu-bar" style="width:0%;background:var(--series-3)"></div></div></div>
+        <div class="stat-tile"><div class="label">Latest decision</div><div class="value" id="live-stat-decision">none yet</div><div class="sub" id="live-stat-counts"></div></div>
       </div>
       <div id="live-gpu-extra" style="margin-top:10px; display:none;"></div>
     </div>
@@ -281,7 +285,7 @@
         </div>
       </div>
       <div class="panel span-5">
-        <div class="panel-h"><h2>Inside the KAN, latest decision</h2><span class="hint">Edge width = learned importance, color = signed value</span></div>
+        <div class="panel-h"><h2>Inside the KAN, latest decision</h2><span class="hint">Thicker means more important</span></div>
         <svg class="chart" id="mini-kan" viewBox="0 0 520 230" style="height:230px"></svg>
         <svg class="chart" id="mini-contrib" viewBox="0 0 520 120" style="height:120px"></svg>
       </div>
@@ -335,7 +339,7 @@
       </div>
       <div class="panel span-3">
         <div class="panel-h"><h2>Verdict</h2></div>
-        <div class="gauge-score" id="kan-score">—</div>
+        <div class="gauge-score" id="kan-score">n/a</div>
         <div id="kan-decision" style="margin:6px 0 12px"></div>
         <svg class="chart" id="kan-gauge" viewBox="0 0 300 46" style="height:46px"></svg>
         <p class="note">Bands: below 40 continue, 40 to 75 adjust learning rate, 75 and above stop.</p>
@@ -427,7 +431,7 @@
 <section id="g-status"><h2>Status, epoch, validation accuracy, run number</h2>
 <ul>
 <li><b>Status</b>: Starting while the process loads, Running while it trains, Completed when it finishes all epochs, Stopped when you stop it, the gate stops it, or it crashes.</li>
-<li><b>Epoch (this run)</b>: how many full passes over the training images have finished. The small text is the learning rate in use now.</li>
+<li><b>Epoch</b>: how many full passes over the training images have finished. The small text is the learning rate in use now.</li>
 <li><b>Val accuracy</b>: the share of 2,000 held-out test images classified correctly after the latest epoch. The small text is the best validation loss so far.</li>
 <li><b>Auto run #</b>: with Auto-continuous on, each finished run is followed by a fresh one. The number counts runs, and the small text counts epochs trained in this session. Each run starts from new random weights.</li></ul>
 <p class="where">See it on the <a href="#live" data-tab="live">Live tab</a>.</p></section>
@@ -453,7 +457,7 @@
 <p>Because training keeps running while the agents work, a decision takes effect at the next epoch boundary.</p></section>
 
 <section id="g-loss"><h2>Loss and gate decisions</h2>
-<p>The horizontal axis is epochs of the current run. The light line is <b>validation loss</b>, the grey line is <b>training loss</b>.</p>
+<p>The horizontal axis is epochs of the current run. The blue line is <b>validation loss</b>, the orange line is <b>training loss</b>.</p>
 <ul>
 <li>Training loss usually keeps falling. Validation loss falls, flattens, and may rise again. Rising validation loss with falling training loss means the model is memorising the training images (overfitting). The best point to stop is the lowest part of the validation line.</li>
 <li>Each dot is one gate decision, placed on the validation line at the epoch it looked at: green continue, amber adjust learning rate, red stop. Hover a dot for its score.</li>
@@ -461,10 +465,10 @@
 <p>The chart restarts at every new run in Auto-continuous mode.</p></section>
 
 <section id="g-minikan"><h2>Inside the KAN, latest decision (small)</h2>
-<p>A compact picture of the latest decision. Five nodes on the left are the features, the middle column is the hidden layer, the right node is the stop score. Each line is a learned function. Line thickness is how much that function matters over typical inputs; a light line pushes the score up for this input and a grey line pushes it down. A dashed middle node was pruned during training and carries nothing. The bars underneath show how much each feature added to or took from the score. The full version is on the <a href="#kan" data-tab="kan">KAN Network tab</a>.</p></section>
+<p>A compact picture of the latest decision. Five nodes on the left are the features, the middle column is the hidden layer, the right node is the stop score. Each line is a learned function. Line thickness is how much that function matters over typical inputs; a blue line pushes the score up for this input and a red line pushes it down. A dashed middle node was pruned during training and carries nothing. The bars underneath show how much each feature added to or took from the score. The full version is on the <a href="#kan" data-tab="kan">KAN Network tab</a>.</p></section>
 
 <section id="g-hwchart"><h2>Real-time hardware load</h2>
-<p>Three lines, one sample about every two seconds, covering the last five minutes or so: CPU, memory and GPU as above. A hump when a run starts is normal: loading PyTorch, reading the dataset and starting data workers. Utilisation then holds near the level the selected mode allows, and falls when the run ends. A drop at the end of the chart usually means the run finished, not that the system is throttling.</p></section>
+<p>Three lines (CPU blue, memory orange, GPU green), one sample about every two seconds, covering the last five minutes or so: CPU, memory and GPU as above. A hump when a run starts is normal: loading PyTorch, reading the dataset and starting data workers. Utilisation then holds near the level the selected mode allows, and falls when the run ends. A drop at the end of the chart usually means the run finished, not that the system is throttling.</p></section>
 
 <section id="g-log"><h2>Process and decision log</h2>
 <p>A running record: the hardware check at launch, every line the training process prints, each agent invocation, each gate verdict with its largest contributing feature, and every learning-rate change. Nothing in it is scripted.</p></section>
@@ -474,13 +478,13 @@
 
 <section id="g-network"><h2>The network drawing</h2>
 <p>This is the real gate. The left column holds the five features and the numbers fed in. Each line is one edge, and the small box on it plots the function that edge applies to its input (shown for the four most important edges; all are in the edge section below). The middle column is three hidden nodes that add their incoming edges together. The right node is the stop score. Move a slider on the left, or load a past decision, and the numbers, colours and score update from the real gate.</p>
-<ul><li>Thickness: how much the edge's output varies across typical inputs.</li><li>Light line: the edge raises the score for the current input. Grey: it lowers it.</li><li>Dashed circle: a pruned node.</li></ul></section>
+<ul><li>Thickness: how much the edge's output varies across typical inputs.</li><li>Blue line: the edge raises the score for the current input. Red: it lowers it.</li><li>Dashed circle: a pruned node.</li></ul></section>
 
 <section id="g-verdict"><h2>Verdict and bands</h2>
 <p>The big number is the stop score for the current inputs. Below 40 the gate says continue, from 40 to 75 adjust the learning rate, from 75 up stop. The marker shows where the score sits on that scale. The bands are fixed cut-offs and are the same for every run.</p></section>
 
 <section id="g-waterfall"><h2>How the score was built</h2>
-<p>The first bar is the baseline: the gate's output when every feature is zero. Each following bar is one feature's contribution: the output minus the output with that single feature set to zero. The last bar is the score. Light bars raise it, grey bars lower it.</p>
+<p>The first bar is the baseline: the gate's output when every feature is zero. Each following bar is one feature's contribution: the output minus the output with that single feature set to zero. The last bar is the score. Blue bars raise it, red bars lower it.</p>
 <p>The contributions add up exactly to the score only when the network is additive. The note under the chart says whether that holds for the gate in use. When it does not, the bars are estimates, but the formula next to it is still exact.</p></section>
 
 <section id="g-formula"><h2>The formula the gate executes</h2>
@@ -515,6 +519,7 @@
 <li><b>Background</b>: the process gets low OS priority, a quarter of the CPU cores, one thread and a short pause after each batch. It trains slowly and stays out of the way.</li>
 <li><b>Normal</b>: default priority and a few data-loading workers.</li>
 <li><b>Turbo</b>: more workers and mixed precision for speed. It uses as much of the machine as it can.</li></ul>
+<p><b>Train on</b> chooses the device: Auto uses the NVIDIA GPU when PyTorch can see one, a numbered entry pins the run to that GPU, and CPU only forces the processor. The notice under the control deck appears when a GPU exists but PyTorch cannot use it. Running start.ps1 or start.sh again installs the matching CUDA build of PyTorch.</p>
 <p>The CPU in this tool is the training process. If the GPU is busy while the NVIDIA GPU reads zero, something else on the machine is using it: the browser drawing a page, a video, another application.</p></section>
 
       </div>
@@ -630,7 +635,7 @@ $('mode-slider').addEventListener('click', (e) => {
 
 /* ---------- guide links: "what is this?" next to each result ---------- */
 const GUIDE_LINKS = {
-  'Status': 'g-status', 'Epoch (this run)': 'g-status', 'Val accuracy': 'g-status', 'Auto run #': 'g-status',
+  'Status': 'g-status', 'Epoch': 'g-status', 'Val accuracy': 'g-status', 'Auto run #': 'g-status',
   'CPU': 'g-hardware', 'Memory': 'g-hardware', 'GPU': 'g-hardware', 'Latest decision': 'g-decision',
   'Agent pipeline': 'g-pipeline', 'Loss and gate decisions': 'g-loss', 'Inside the KAN, latest decision': 'g-minikan',
   'Real-time hardware load': 'g-hwchart', 'Process and decision log': 'g-log', 'Decision audit log': 'g-audit',
@@ -810,7 +815,7 @@ loadGateFormula();
 /* ================= LIVE VIEW ================= */
 let liveWs = null;
 const live = { loss: [], val: [], acc: [], decisions: [], hw: [], lr: null, steps: {} };
-const fmtPct = (v) => v == null ? '—' : `${v.toFixed(0)}%`;
+const fmtPct = (v) => v == null ? 'n/a' : `${v.toFixed(0)}%`;
 
 function linePlot(svg, W, H, series, opts = {}) {
   svg.innerHTML = '';
@@ -917,17 +922,17 @@ function renderPhase(phase) {
 
 function renderKpis(snap) {
   const n = live.loss.length;
-  $('live-stat-epoch').textContent = n || '—';
+  $('live-stat-epoch').textContent = n || '0';
   $('live-stat-lr').textContent = live.lr != null ? `lr ${Number(live.lr).toPrecision(3)}` : '';
   const acc = live.acc[live.acc.length - 1];
-  $('live-stat-acc').textContent = acc != null ? `${(100 * acc).toFixed(1)}%` : '—';
+  $('live-stat-acc').textContent = acc != null ? `${(100 * acc).toFixed(1)}%` : 'n/a';
   $('live-stat-bestloss').textContent = live.val.length ? `best val loss ${Math.min(...live.val).toFixed(3)}` : '';
   if (snap) {
     $('live-stat-run').textContent = `#${(snap.auto_run_count || 0) + 1}`;
     $('live-stat-total-epochs').textContent = `${snap.total_epochs_trained || 0} epochs this session`;
   }
   const last = live.decisions[live.decisions.length - 1];
-  $('live-stat-decision').innerHTML = last ? badge(last.decision) : '—';
+  $('live-stat-decision').innerHTML = last ? badge(last.decision) : 'none yet';
   const c = { continue: 0, adjust_lr: 0, early_stop: 0 }; live.decisions.forEach(d => c[d.decision]++);
   $('live-stat-counts').textContent = live.decisions.length ? `${c.continue} continue · ${c.adjust_lr} adjust · ${c.early_stop} stop` : '';
 }
@@ -970,7 +975,7 @@ function renderVerdict(d) {
 
 /* ---------- audit + log ---------- */
 function topDriver(d) {
-  const c = d.explanation && d.explanation.contributions; if (!c) return '—';
+  const c = d.explanation && d.explanation.contributions; if (!c) return 'n/a';
   const [k, v] = Object.entries(c).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
   return `${FEATURE_LABEL[k]} ${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
 }
@@ -1219,7 +1224,7 @@ async function runExplain() {
 function paintKan() {
   if (!kanNet) return;
   drawNetwork($('kan-net'), kanNet, kanExpl, 760, 520, { sparklines: true, padX: 140 });
-  $('kan-score').textContent = kanExpl ? kanExpl.score.toFixed(1) : '—';
+  $('kan-score').textContent = kanExpl ? kanExpl.score.toFixed(1) : 'n/a';
   $('kan-decision').innerHTML = kanExpl ? badge(kanExpl.decision) : '';
   drawGauge(kanExpl ? kanExpl.score : null); drawWaterfall(kanExpl); drawEdgeMultiples(kanNet, kanExpl);
   $('kan-additive').textContent = kanExpl ? (kanExpl.additive
@@ -1228,7 +1233,7 @@ function paintKan() {
 }
 async function renderKanView() {
   buildSliders();
-  try { await loadNetwork(); } catch (e) { $('kan-formula').textContent = 'Could not load the gate - is the backend running?'; return; }
+  try { await loadNetwork(); } catch (e) { $('kan-formula').textContent = 'Could not load the gate. Is the backend running?'; return; }
   const last = live.decisions[live.decisions.length - 1];
   if (last && kanFollowLive) setKanFeatures(last.features); else scheduleExplain(0);
 }
@@ -1329,7 +1334,12 @@ async function loadGpuOptions() {
   try {
     const hw = await (await fetch(`${API_BASE}/api/hardware`)).json();
     renderHardware(hw);
-    if (!hw.gpu_available || hw.gpus.length < 2) return;
+    const note = $('gpu-notice');
+    if (hw.gpu_available && hw.torch_cuda === false) {
+      note.style.display = 'block';
+      note.innerHTML = `An NVIDIA GPU was found (${hw.gpus[0].name}), but the installed PyTorch has no CUDA support, so training will run on the CPU. Run <code>start.ps1</code> (Windows) or <code>start.sh</code> again: it installs the CUDA build automatically. <a class="why" href="#guide/g-modes">what is this?</a>`;
+    }
+    if (!hw.gpu_available) return;
     hw.gpus.forEach(g => { const o = document.createElement('option'); o.value = g.index; o.textContent = `[${g.index}] ${g.name}`; $('live-gpu-select').appendChild(o); });
   } catch (e) { }
 }

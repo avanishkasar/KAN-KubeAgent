@@ -32,21 +32,7 @@ Write-Host "Installing dependencies (this only downloads what's missing)..."
 & $VenvPython -m pip install --quiet --upgrade pip
 & $VenvPython -m pip install --quiet -r dashboard\backend\requirements.txt -r agents\requirements.txt -r training\requirements.txt -r kan_gate\requirements.txt
 
-$hasNvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
-if ($hasNvidiaSmi) {
-    $cudaOk = & $VenvPython -c "import torch; print(torch.cuda.is_available())" 2>$null
-    if ($cudaOk -ne "True") {
-        Write-Host "NOTE: nvidia-smi found a GPU, but the installed torch has no CUDA support."
-        Write-Host "      Training will run on CPU until you run:"
-        Write-Host "        $VenvPython -m pip install torch --index-url https://download.pytorch.org/whl/cu121"
-        Write-Host "        $VenvPython -m pip install torchvision"
-        Write-Host "      See training\requirements.txt for details."
-    } else {
-        Write-Host "GPU detected and torch has CUDA support - training will use the GPU."
-    }
-} else {
-    Write-Host "No NVIDIA GPU detected (no nvidia-smi) - training will run on CPU."
-}
+& $VenvPython training\ensure_cuda_torch.py
 
 if (-not (Test-Path "kan_gate\checkpoints\kan_gate_config.yml")) {
     Write-Host "No KAN gate checkpoint found - training one on the bundled real learning curves (one-time)..."

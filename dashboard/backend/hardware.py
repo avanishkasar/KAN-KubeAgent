@@ -64,3 +64,20 @@ def sample() -> dict:
         "gpu_available": bool(gpus),
         "gpus": gpus,
     }
+
+
+_torch_cuda_cache: dict = {}
+
+
+def torch_cuda_available() -> bool | None:
+    """Whether the PyTorch that training will use can see a CUDA GPU. Checked
+    once in a subprocess (importing torch here would slow the server)."""
+    if "v" not in _torch_cuda_cache:
+        import sys
+        try:
+            r = subprocess.run([sys.executable, "-c", "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)"],
+                               capture_output=True, timeout=90)
+            _torch_cuda_cache["v"] = r.returncode == 0
+        except Exception:
+            _torch_cuda_cache["v"] = None
+    return _torch_cuda_cache["v"]

@@ -31,18 +31,7 @@ echo "Installing dependencies (this only downloads what's missing)..."
 pip install --quiet --upgrade pip
 pip install --quiet -r dashboard/backend/requirements.txt -r agents/requirements.txt -r training/requirements.txt -r kan_gate/requirements.txt
 
-if command -v nvidia-smi >/dev/null 2>&1; then
-    if ! python3 -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null; then
-        echo "NOTE: nvidia-smi found a GPU, but the installed torch has no CUDA support."
-        echo "      Training will run on CPU until you run:"
-        echo "        pip install torch --index-url https://download.pytorch.org/whl/cu121 && pip install torchvision"
-        echo "      See training/requirements.txt for details."
-    else
-        echo "GPU detected and torch has CUDA support - training will use the GPU."
-    fi
-else
-    echo "No NVIDIA GPU detected (no nvidia-smi) - training will run on CPU."
-fi
+python3 training/ensure_cuda_torch.py
 
 if [ ! -f "kan_gate/checkpoints/kan_gate_config.yml" ]; then
     echo "No KAN gate checkpoint found - training one on the bundled real learning curves (one-time)..."

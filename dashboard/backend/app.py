@@ -142,7 +142,7 @@ def hardware_snapshot():
     """One-off real hardware read, independent of any live run - used by
     the frontend to show what this machine has (GPU or not) before you
     even start a run."""
-    return hardware.sample()
+    return {**hardware.sample(), "torch_cuda": hardware.torch_cuda_available()}
 
 
 class LiveStartRequest(BaseModel):

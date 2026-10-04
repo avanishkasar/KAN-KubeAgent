@@ -148,7 +148,9 @@ class LiveSession:
         if hw["gpu_available"]:
             gpu_names = ", ".join(f"[{g['index']}] {g['name']}" for g in hw["gpus"])
             gpu_report = f"{len(hw['gpus'])} GPU(s) detected: {gpu_names}"
-            if gpu_index is not None:
+            if gpu_index is not None and gpu_index < 0:
+                gpu_report += ". CPU-only training was selected"
+            elif gpu_index is not None:
                 gpu_report += f" - training pinned to GPU {gpu_index}"
             elif len(hw["gpus"]) > 1:
                 gpu_report += " - no GPU selected, CUDA will pick its own default"

@@ -84,7 +84,7 @@ class LocalProcessTrainJobClient:
             # Restricts which physical GPU CUDA sees for this subprocess -
             # the real mechanism for "which GPU do I train on" when the
             # machine has more than one.
-            env["CUDA_VISIBLE_DEVICES"] = str(gpu_index)
+            env["CUDA_VISIBLE_DEVICES"] = "" if gpu_index < 0 else str(gpu_index)
         cmd = [sys.executable, str(TRAINING_SCRIPT),
                "--epochs", str(epochs), "--lr", str(lr),
                "--batch-size", str(batch_size), "--subset-size", str(subset_size),
