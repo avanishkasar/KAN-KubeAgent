@@ -56,7 +56,7 @@ def main() -> int:
     print(f"NVIDIA GPU found, driver supports CUDA {version[0]}.{version[1]}. Installing the {tag} build of PyTorch (about 2.5 GB)...")
     subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "torch", "torchvision"], check=False)
     result = subprocess.run([sys.executable, "-m", "pip", "install", "torch", "torchvision",
-                             "--index-url", INDEX.format(tag), "--extra-index-url", "https://pypi.org/simple"])
+                             "--index-url", INDEX.format(tag=tag), "--extra-index-url", "https://pypi.org/simple"])
     if result.returncode != 0 or not torch_has_cuda():
         print("The CUDA install did not work. Training will fall back to the CPU. "
               "See training/requirements.txt for the manual command.")
