@@ -94,7 +94,7 @@ CONTINUE    ADJUST LR      EARLY-STOP
 (no-op)   (patch TrainJob) (stop + free GPU)
 ```
 
-The dashboard has four views: Live (a real training subprocess with real CPU/GPU telemetry, the agent pipeline lighting up node by node, and every gate decision traced through the network), KAN Network (the gate's learned edge functions, what-if sliders, and an exact per-feature breakdown of each score), Research (the benchmark results), and Mock/Synthetic (an instantly generated synthetic curve for fast iteration).
+The dashboard has five views: Guide (a plain-language explanation of every number and chart, linked from each one), Live (a real training subprocess with real CPU/GPU telemetry, the agent pipeline lighting up node by node, and every gate decision traced through the network), KAN Network (the gate's learned edge functions, what-if sliders, and an exact per-feature breakdown of each score), Research (the benchmark results), and Mock/Synthetic (an instantly generated synthetic curve for fast iteration).
 
 ## Hindsight-supervised gate
 
