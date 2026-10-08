@@ -16,6 +16,10 @@ KAN-KubeAgent sits at the intersection of three technologies:
 
 Can a Kolmogorov-Arnold Network act as a transparent, formula-producing gate inside an agentic fine-tuning controller, deciding when to continue, adjust the learning rate, or stop and reallocate a Kubeflow TrainJob, in a way a human can audit at a glance?
 
+## Try it in the browser
+
+A static preview is published on GitHub Pages at https://avanishkasar.github.io/KAN-KubeAgent/ . It runs the real trained gate in your browser (KAN Network tab), shows the stored benchmark results (Research tab) and the Guide. Live training needs the app on your own machine, see below. The preview is rebuilt with `python tools/build_pages.py`.
+
 ## Getting started
 
 Requirements: Python 3.10 or newer and internet access for the first run (Fashion-MNIST is downloaded once). An NVIDIA GPU is optional.
