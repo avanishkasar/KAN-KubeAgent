@@ -71,7 +71,10 @@ class LocalProcessTrainJobClient:
     def create(self, name: str, epochs: int = 30, lr: float = 2e-4,
                batch_size: int = 128, subset_size: int = 6000,
                gpu_hours_budget: float = 10.0, mode: str = "normal",
-               gpu_index: int | None = None, seed: int | None = None) -> TrainJobStatus:
+               gpu_index: int | None = None, seed: int | None = None,
+               extra_args: list[str] | None = None) -> TrainJobStatus:
+        """extra_args are passed through to the training script (the
+        experiments use them to select a non-default workload)."""
         if mode not in _MODE_TRAINING_ARGS:
             raise ValueError(f"Unknown mode: {mode!r}, expected one of {tuple(_MODE_TRAINING_ARGS)}")
         mode_args = _MODE_TRAINING_ARGS[mode]
@@ -95,6 +98,7 @@ class LocalProcessTrainJobClient:
             cmd.append("--amp")
         if seed is not None:
             cmd += ["--seed", str(seed)]
+        cmd += extra_args or []
 
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,

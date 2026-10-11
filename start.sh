@@ -35,7 +35,7 @@ python3 training/ensure_cuda_torch.py
 
 if [ ! -f "kan_gate/checkpoints/kan_gate_config.yml" ]; then
     echo "No KAN gate checkpoint found - training one on the bundled real learning curves (one-time)..."
-    python3 -m kan_gate.train --curves experiments/data/curves.jsonl
+    python3 -m kan_gate.train --curves experiments/data/curves*.jsonl
 fi
 
 echo "Starting dashboard server in the background (survives this terminal closing)..."

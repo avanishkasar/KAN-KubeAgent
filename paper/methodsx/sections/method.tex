@@ -1,0 +1,80 @@
+% ---------------------------------------------------------------- Method details
+\section*{Method details}
+
+\subsection*{Overview}
+The method produces a \emph{gate}: a small function that reads five causal summary statistics of a running training job and returns a stop score $s\in[0,100]$. The score is mapped to one of three actions: continue ($s<40$), halve the learning rate ($40\le s<75$) or stop the job ($s\ge75$). The gate is a Kolmogorov--Arnold Network (KAN)~\cite{liu2025kan} whose edges are replaced, after training, by closed-form univariate functions, so the gate \emph{is} an algebraic expression that an operator can read, recompute and audit. It is trained by \emph{hindsight supervision}: every decision point of a completed training run is labelled with the improvement in validation loss that was actually still to come. Fig.~\ref{fig:overview} shows the five steps; each is specified below, followed by a step-by-step procedure and the exact commands that reproduce every number in this article.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\footnotesize, node distance=4mm and 5mm,
+  box/.style={draw=black!55, rounded corners=2pt, minimum height=12mm, text width=24mm, align=center, inner sep=3pt, fill=white},
+  key/.style={box, draw=kblue, line width=0.9pt, fill=kblue!7},
+  arr/.style={-{Latex[length=2mm]}, black!70, line width=0.6pt}]
+\node[box] (s1) {\textbf{1. Record}\\uncontrolled runs:\\val.\ loss, grad.\ norm};
+\node[box, right=of s1] (s2) {\textbf{2. Featurise}\\5 causal features\\every 2 epochs};
+\node[key, right=of s2] (s3) {\textbf{3. Label in hindsight}\\remaining gain\\$\rightarrow$ target $y_t$};
+\node[key, right=of s3] (s4) {\textbf{4. Fit KAN}\\$[5,3,1]$, prune,\\fix edges symbolically};
+\node[box, right=of s4] (s5) {\textbf{5. Deploy}\\binding gate\\+ LR guard};
+\draw[arr] (s1) -- (s2); \draw[arr] (s2) -- (s3); \draw[arr] (s3) -- (s4); \draw[arr] (s4) -- (s5);
+\node[below=3mm of s4, text width=60mm, align=center, font=\scriptsize, text=black!70] (out) {output: $s=f(x_1,\dots,x_5)$, a closed-form expression\\that is executed as written};
+\draw[arr, dashed] (s4) -- (out);
+\end{tikzpicture}
+\caption{The five steps of the method. Steps 3 and 4 (highlighted) are the customisation of the original KAN method; steps 1, 2 and 5 adapt standard early-stopping practice.}
+\label{fig:overview}
+\end{figure}
+
+\subsection*{Step 1: record uncontrolled learning curves}
+Train a set of runs of the target kind of job to their full epoch budget $T$ with no intervention, and record per epoch $t$ the validation loss $v_t$, the mean global $\ell_2$ gradient norm $g_t$ over the epoch's mini-batches, the validation accuracy and the wall-clock time. The validation loss must come from data the model never trains on. Vary the settings that change the shape of a curve (learning rate, batch size, random seed), because the gate learns from the variety of curve shapes, not from any single run. In this article $T=40$ and each workload contributes 36 runs (six learning rates $\times$ two batch sizes $\times$ three seeds; Table~\ref{tab:workloads}).
+
+\subsection*{Step 2: compute five causal features}
+At decision epoch $t$ the gate may use only $v_{1:t}$ and $g_{1:t}$. With a window of $w=5$ epochs, let $W_t=(v_{t-w+1},\dots,v_t)$ and $\Delta_i$ the successive differences inside $W_t$. The five features, each in $[0,1]$, are
+\begin{align}
+x_1 &= \operatorname{clip}\!\Big(1-10\,\frac{\max(v_{t-w+1}-v_t,\,0)}{|v_{t-w+1}|}\Big) && \text{plateau score}\label{eq:f1}\\
+x_2 &= \operatorname{clip}\!\Big(\frac{\tfrac1w\sum_{s=t-w+1}^{t} g_s}{\max_{s\le t} g_s}\Big) && \text{gradient trend}\label{eq:f2}\\
+x_3 &= \frac{\#\{i:\Delta_i\Delta_{i+1}<0\}}{w-2} && \text{oscillation (LR-decay benefit)}\label{eq:f3}\\
+x_4 &= 1-t/T && \text{budget remaining}\label{eq:f4}\\
+x_5 &= \operatorname{clip}\!\big((t-\arg\min_{s\le t} v_s)/30\big) && \text{epochs since improvement}\label{eq:f5}
+\end{align}
+where $\operatorname{clip}(\cdot)$ clips to $[0,1]$ and the window is truncated to the epochs available when $t<w$. Normalising the gradient norm by the run's own peak (Eq.~\ref{eq:f2}) makes $x_2$ scale-free across architectures, whose raw gradient norms differ by orders of magnitude. $x_3$ counts direction changes of the loss, a sign that a smaller learning rate may help. In the software the budget feature is named \texttt{gpu\_hours\_remaining\_vs\_budget}; in all experiments here it is the fraction of the epoch budget left, not a measured GPU-hour figure. Decisions are taken every two epochs from epoch 4, i.e.\ at $t\in\{4,6,\dots,38\}$, giving 18 decision points per run.
+
+\subsection*{Step 3: label every decision point in hindsight}
+Let $m_t=\min_{s\le t}v_s$ be the best validation loss seen by epoch $t$. Because the recorded run continued to $T$, the relative improvement that was still to come is known:
+\begin{equation}
+r_t=\frac{m_t-m_T}{m_t}\ \ge 0 .
+\label{eq:gain}
+\end{equation}
+The training target for the decision point is
+\begin{equation}
+y_t=100\cdot\operatorname{clip}\!\big(1-r_t/\tau\big),
+\label{eq:target}
+\end{equation}
+with tolerance $\tau=5\%$. A point with at least $\tau$ of improvement ahead receives $y_t=0$ (keep training); a point after which the run never improves again receives $y_t=100$ (stop now). With the decision bands above, a stop ($y_t\ge75$) means that less than $\tau/4=1.25\%$ relative improvement remained. The labels use the future only at training time; the features never do.
+
+This step is the central customisation. The original agentic controller trained its gate to imitate a hand-written three-rule policy, which caps the gate at the quality of that rule, and re-labelled live runs with the gate's own past decisions, which is self-distillation and adds no information. Hindsight labels instead measure what each decision would actually have cost or saved.
+
+\subsection*{Step 4: fit a KAN and fix its edges to symbolic functions}
+The gate is a KAN of width $[5,3,1]$ with B-spline edges (grid size 5, order $k=3$), implemented with \texttt{pykan} 0.2.8. A KAN replaces each weight of a multilayer perceptron with a learnable univariate function on the edge and sums at the nodes~\cite{liu2025kan}, following the Kolmogorov--Arnold representation~\cite{kolmogorov1957}; its output here is
+\begin{equation}
+s(\mathbf{x})=\sum_{j=1}^{3}\phi^{(2)}_{j}\Big(\sum_{i=1}^{5}\phi^{(1)}_{j,i}(x_i)\Big).
+\label{eq:kan}
+\end{equation}
+Fitting regresses $s$ on the targets $y_t$ with mean squared error, using Adam for 200 steps with an $\ell_1$ sparsity penalty $\lambda=0.01$ and entropy penalty 2.0, an 80/20 split of the training decision points for monitoring, pruning of inactive nodes and edges, and a 40-step refit of the pruned network. Then every remaining edge function is replaced by the best-fitting function from the library $\{x, x^2, x^3, \sin\}$ with fitted affine parameters (\texttt{auto\_symbolic}), and the expression is expanded with SymPy. After this step the network computes exactly the extracted expression: the formula shown to an operator is the decision function, not an approximation of it. We verify this on every gate by evaluating the network and the formula on the same inputs (\emph{faithfulness}, reported in Method validation).
+
+The library is deliberately narrow. Exponentials, logarithms and nested compositions fit slightly better but produce expressions that are not readable at a glance, which defeats the purpose; the width $[5,3,1]$ is chosen for the same reason.
+
+\subsection*{Step 5: deploy the gate as the binding decision layer}
+In the released controller (\texttt{KAN-KubeAgent}) a LangGraph pipeline observes a running job, computes the features and lets a supervisor agent (a large language model when an API key is configured, otherwise a rule-based fallback) propose an action with a rationale. The proposal is advisory: the gate's band decision is what the executor carries out. \emph{Continue} is a no-op, \emph{adjust learning rate} halves the job's learning rate at the next epoch boundary, and \emph{early stop} terminates the job. Every decision is logged with the features, the score, the formula and an exact additive breakdown of the score into per-feature contributions.
+
+A plateaued job keeps scoring in the adjust band, and an unguarded executor halves its learning rate at every decision point. We therefore add a \emph{learning-rate guard}: an adjustment is executed only if at least two decision points have passed since the previous one, and at most three times per job; a blocked adjustment is logged as deferred and the job continues unchanged. The effect of the guard is measured in closed-loop runs below.
+
+\subsection*{Step-by-step procedure}
+\begin{enumerate}
+\item Install Python 3.10 or newer and the dependencies: \texttt{pip install -r training/requirements.txt -r kan\_gate/requirements.txt -r agents/requirements.txt -r dashboard/backend/requirements.txt}. A GPU is optional; every experiment here ran on four CPU cores.
+\item Record curves for each workload (Step 1):\\ \texttt{python -m experiments.collect\_curves --workload fmnist\_cnn --epochs 40 --parallel 2}\\ and likewise for \texttt{mnist\_cnn}, \texttt{cifar10\_cnn} and \texttt{fmnist\_mlp\_sgd}. Each run is a subprocess of the same training script the live controller uses.
+\item Evaluate (Steps 2 to 4 inside every fold): \texttt{python -m experiments.generalization} (both protocols, all baselines, sweeps, ablations) and \texttt{python -m experiments.benchmark} (the original single-workload benchmark).
+\item Run closed-loop control: \texttt{python -m experiments.closed\_loop --workload <w> --gate lowo} for each workload, \texttt{--no-guard} for the unguarded executor.
+\item Train the deployable gate on all recorded curves: \texttt{python -m kan\_gate.train --curves experiments/data/curves*.jsonl}. The learned formula is printed and the checkpoint saved.
+\item Start the controller and dashboard with \texttt{./start.sh} (Linux, macOS) or \texttt{.\textbackslash start.ps1} (Windows) and open \url{http://localhost:8000}.
+\item Regenerate the tables, numbers and figures of this article: \texttt{python -m experiments.paper\_methodsx}.
+\end{enumerate}
+To apply the method to a new kind of job, repeat steps 2 to 5 with curves of that job; to use it without retraining, use a gate trained on other workloads, which is what the leave-one-workload-out protocol below evaluates.

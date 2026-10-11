@@ -16,8 +16,8 @@ from kan_gate.features import extract_features
 from kan_gate.gate import KANGate
 
 
-def build_graph(client: TrainJobClient, gate: KANGate):
-    executor = KANGatedExecutor(client)
+def build_graph(client: TrainJobClient, gate: KANGate, executor: KANGatedExecutor | None = None):
+    executor = executor or KANGatedExecutor(client)
 
     def metrics_watcher_node(state: AgentState) -> AgentState:
         status = client.get_status(state["trainjob_name"])

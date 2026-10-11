@@ -283,8 +283,11 @@ class LiveSession:
                         f"largest contribution: {top[0]} {top[1]:+.1f}) -> {entry['outcome']}",
                         level=level,
                     )
-                    if entry["decision"] == "adjust_lr":
+                    if entry["outcome"] == "LR_ADJUSTED":
                         await self.emit_event(f"Patched learning rate to {entry.get('new_lr', '?')}")
+                    elif entry["outcome"] == "LR_ADJUST_DEFERRED":
+                        await self.emit_event("Learning rate change deferred: the previous change "
+                                              "is still taking effect or the limit of 3 is reached")
                     elif entry["decision"] == "early_stop":
                         await self.emit_event(
                             f"Terminating training subprocess for '{job_name}' (KAN gate authority)",

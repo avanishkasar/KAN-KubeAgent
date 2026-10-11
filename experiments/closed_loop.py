@@ -6,14 +6,22 @@ Here the gate's decisions really execute - "adjust_lr" patches the running
 process's learning rate, "early_stop" terminates it - so the effect of LR
 adjustment is measured, not assumed. Each controlled run uses the same
 seed and training settings as its uncontrolled counterpart in
-experiments/data/curves.jsonl, and the gate was trained only on the other
-seeds' curves (experiments/results/gates/kan_hindsight_test_seed<S>).
+experiments/data/, and the gate never saw that counterpart's curve:
+by default it is the within-workload gate trained on the other seeds
+(experiments/results/gates/kan_hindsight_test_seed<S>); with --gate lowo
+it is the gate trained on the other three workloads only
+(experiments/results/gates/kan_lowo_<workload>, from
+experiments/generalization.py), so the controlled workload is unseen.
+
+--no-guard disables the executor's learning-rate adjustment guard
+(agents/executor.py) to reproduce the original, unguarded behaviour.
 
 Control is asynchronous, exactly as in the live dashboard: the training
 process keeps running while the agents deliberate, so a decision made
 after epoch t takes effect from the next epoch boundary the process reads.
 
-    python -m experiments.closed_loop --test-seed 2
+    python -m experiments.closed_loop --test-seed 2 --no-guard          # original run
+    python -m experiments.closed_loop --workload cifar10_cnn --gate lowo
 """
 from __future__ import annotations
 
@@ -24,13 +32,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import agents.local_process_client as lpc
+from agents.executor import KANGatedExecutor
 from agents.graph import build_graph
+from experiments.collect_curves import WORKLOADS, curves_path
 from kan_gate.gate import KANGate
 from kan_gate.hindsight import DEFAULT_CHECK_EVERY, DEFAULT_FIRST_CHECK
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CURVES = REPO_ROOT / "experiments" / "data" / "curves.jsonl"
-OUT = REPO_ROOT / "experiments" / "results" / "closed_loop.json"
+RESULTS = REPO_ROOT / "experiments" / "results"
 
 # Same training-side settings experiments/collect_curves.py used (2 parallel
 # runs x 2 threads, in-process data loading) so controlled and uncontrolled
@@ -38,13 +47,17 @@ OUT = REPO_ROOT / "experiments" / "results" / "closed_loop.json"
 lpc._MODE_TRAINING_ARGS["normal"] = {"workers": 0, "amp": False, "cpu_threads": 2, "throttle_ms": 0}
 
 
-def control_one(rec: dict, gate_path: Path, epochs: int) -> dict:
+def control_one(rec: dict, gate_path: Path, epochs: int, extra_args: list[str],
+                guard: bool) -> dict:
     gate = KANGate.load(gate_path)
     client = lpc.LocalProcessTrainJobClient()
     name = f"closed-{rec['run_id']}"
     client.create(name, epochs=epochs, lr=rec["lr"], batch_size=rec["batch_size"],
-                  subset_size=rec["subset_size"], mode="normal", seed=rec["seed"])
-    graph = build_graph(client, gate)
+                  subset_size=rec["subset_size"], mode="normal", seed=rec["seed"],
+                  extra_args=extra_args)
+    executor = (KANGatedExecutor(client) if guard
+                else KANGatedExecutor(client, max_lr_adjustments=None, cooldown_checks=0))
+    graph = build_graph(client, gate, executor)
     state = {"trainjob_name": name, "audit_log": []}
     next_check = DEFAULT_FIRST_CHECK
     t0 = time.time()
@@ -64,6 +77,7 @@ def control_one(rec: dict, gate_path: Path, epochs: int) -> dict:
         "run_id": rec["run_id"], "lr": rec["lr"], "batch_size": rec["batch_size"], "seed": rec["seed"],
         "phase": status.phase, "epochs_run": status.epoch,
         "val_loss": status.val_loss_history, "val_acc": status.val_acc_history,
+        "workload": rec.get("workload", "fmnist_cnn"),
         "decisions": [{k: e.get(k) for k in ("decided_after_epoch", "decision", "gate_score", "outcome",
                                               "new_lr", "llm_proposal")} for e in state["audit_log"]],
         "lr_patch_events": [e for e in events if e.startswith("Learning rate patched")],
@@ -74,18 +88,34 @@ def control_one(rec: dict, gate_path: Path, epochs: int) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workload", choices=sorted(WORKLOADS), default="fmnist_cnn")
     parser.add_argument("--test-seed", type=int, default=2)
+    parser.add_argument("--gate", choices=["within", "lowo"], default="within")
+    parser.add_argument("--no-guard", action="store_true")
     parser.add_argument("--parallel", type=int, default=2)
+    parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
+    guard = not args.no_guard
+    if args.out is None:
+        if args.workload == "fmnist_cnn" and args.gate == "within" and not guard:
+            args.out = RESULTS / "closed_loop.json"   # the original experiment's file
+        else:
+            args.out = RESULTS / f"closed_loop_{args.workload}_{args.gate}_{'guard' if guard else 'noguard'}.json"
 
-    gate_path = REPO_ROOT / "experiments" / "results" / "gates" / f"kan_hindsight_test_seed{args.test_seed}"
-    recs = [json.loads(l) for l in CURVES.read_text().splitlines() if l.strip()]
+    if args.gate == "lowo":
+        gate_path = RESULTS / "gates" / f"kan_lowo_{args.workload}"
+    else:
+        if args.workload != "fmnist_cnn":
+            raise SystemExit("within-workload gates are saved for fmnist_cnn only; use --gate lowo")
+        gate_path = RESULTS / "gates" / f"kan_hindsight_test_seed{args.test_seed}"
+    extra_args = WORKLOADS[args.workload][0]
+    recs = [json.loads(l) for l in curves_path(args.workload).read_text().splitlines() if l.strip()]
     recs = sorted((r for r in recs if r["seed"] == args.test_seed), key=lambda r: (r["lr"], r["batch_size"]))
     epochs = len(recs[0]["val_loss"])
     print(f"{len(recs)} configs, seed {args.test_seed}, gate {gate_path.name}", flush=True)
 
     def job(rec):
-        res = control_one(rec, gate_path, epochs)
+        res = control_one(rec, gate_path, epochs, extra_args, guard)
         full_best = min(rec["val_loss"])
         best = min(res["val_loss"]) if res["val_loss"] else float("nan")
         print(f"{rec['run_id']}: ran {res['epochs_run']}/{epochs} epochs, best val {best:.4f} "
@@ -113,14 +143,17 @@ def main():
             "best_val_controlled": best_c, "best_val_uncontrolled": best_un,
             "rel_change_pct": 100 * (best_c - best_un) / best_un,
             "acc_controlled": acc_c, "acc_uncontrolled": acc_un,
-            "n_adjust_lr": sum(d["decision"] == "adjust_lr" for d in r["decisions"]),
+            "n_adjust_lr": sum(d["outcome"] == "LR_ADJUSTED" for d in r["decisions"]),
+            "n_adjust_deferred": sum(d["outcome"] == "LR_ADJUST_DEFERRED" for d in r["decisions"]),
             "stopped_early": r["phase"] == "Stopped",
             "identical_prefix_epochs": n_ident,
         })
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"test_seed": args.test_seed, "runs": results, "summary": summary}, indent=1))
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps({"workload": args.workload, "test_seed": args.test_seed,
+                                    "gate": gate_path.name, "guard": guard,
+                                    "runs": results, "summary": summary}, indent=1))
     total = sum(s["epochs_run"] for s in summary)
-    print(f"wrote {OUT}: {total}/{epochs * len(summary)} epochs used "
+    print(f"wrote {args.out}: {total}/{epochs * len(summary)} epochs used "
           f"({100 * (1 - total / (epochs * len(summary))):.1f}% saved)")
 
 

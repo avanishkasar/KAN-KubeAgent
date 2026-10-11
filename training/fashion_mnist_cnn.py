@@ -1,4 +1,10 @@
-"""Small CPU-friendly CNN fine-tune on Fashion-MNIST.
+"""Small CPU-friendly image-classification training run (Fashion-MNIST by default).
+
+The live dashboard always runs the default workload (Fashion-MNIST, small
+CNN, Adam). The --dataset/--arch/--optimizer options exist so the research
+experiments (experiments/collect_curves.py) can record learning curves of
+other real workloads with the exact same instrumentation: MNIST, CIFAR-10
+and a multilayer perceptron trained with SGD.
 
 Runs as a real subprocess for local/live demos (agents/local_process_client.py)
 or inside a TrainJob pod on a real cluster (k8s/trainjob-example.yaml,
@@ -14,7 +20,7 @@ Also honours a live learning-rate patch, checked once per epoch:
 - TRAINJOB_NAME env var (real cluster mode): a ConfigMap
   `{trainjob_name}-lr-override` that agents/kubeflow_client.py writes.
 
-Requires real Fashion-MNIST to be downloadable (internet access to
+Requires the real dataset to be downloadable (internet access to
 pytorch's dataset mirror). There is no synthetic-data fallback here on
 purpose - per project policy, this script either trains on real data or
 fails loudly; it never silently substitutes fake data. If you're on a
@@ -78,30 +84,84 @@ def read_lr_override(default_lr: float) -> float:
         return default_lr
 
 
-def _load_dataset(subset_size: int, data_root: str):
-    """Real Fashion-MNIST, downloaded if not already cached at data_root.
+CIFAR10_URL = "https://s3.amazonaws.com/fast-ai-imageclas/cifar10.tgz"
+CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer",
+                   "dog", "frog", "horse", "ship", "truck"]
+
+
+def _cifar10_tensors(data_root: str, split: str):
+    """Real CIFAR-10 (fast.ai mirror of the original images), decoded once
+    and cached as a uint8 tensor file. Images in the mirror are grouped by
+    class, so callers draw subsets through a fixed permutation."""
+    import tarfile
+    import urllib.request
+    from pathlib import Path
+
+    import numpy as np
+    import torch
+    from PIL import Image
+
+    root = Path(data_root) / "cifar10"
+    cache = root / f"{split}.pt"
+    if cache.exists():
+        return torch.load(cache)
+    archive = Path(data_root) / "cifar10.tgz"
+    if not (root / split).exists():
+        root.parent.mkdir(parents=True, exist_ok=True)
+        if not archive.exists():
+            log_event(f"Downloading CIFAR-10 from {CIFAR10_URL}")
+            urllib.request.urlretrieve(CIFAR10_URL, archive)
+        with tarfile.open(archive) as tar:
+            tar.extractall(Path(data_root))
+    images, labels = [], []
+    for label, name in enumerate(CIFAR10_CLASSES):
+        for f in sorted((root / split / name).glob("*.png")):
+            images.append(np.asarray(Image.open(f).convert("RGB"), dtype=np.uint8))
+            labels.append(label)
+    x = torch.from_numpy(np.stack(images)).permute(0, 3, 1, 2).contiguous()
+    y = torch.tensor(labels, dtype=torch.long)
+    torch.save((x, y), cache)
+    return x, y
+
+
+def _fixed_subset(x, y, size: int):
+    """A class-mixed subset that is identical for every run (fixed seed 0),
+    independent of the run's own --seed."""
+    import torch
+
+    order = torch.randperm(len(y), generator=torch.Generator().manual_seed(0))[:size]
+    return x[order], y[order]
+
+
+def _load_split(dataset: str, train: bool, size: int, data_root: str):
+    """Real images from the official train (train=True) or test split."""
+    import torch
+    from torch.utils.data import Subset, TensorDataset
+    from torchvision import datasets, transforms
+
+    if dataset == "cifar10":
+        x, y = _cifar10_tensors(data_root, "train" if train else "test")
+        x, y = _fixed_subset(x, y, min(size, len(y)))
+        return TensorDataset(x.float().div(255.0), y)
+    cls = {"fashion_mnist": datasets.FashionMNIST, "mnist": datasets.MNIST}[dataset]
+    full = cls(root=data_root, train=train, download=True, transform=transforms.ToTensor())
+    return Subset(full, range(min(size, len(full))))
+
+
+def _load_dataset(subset_size: int, data_root: str, dataset: str = "fashion_mnist"):
+    """Real training images, downloaded if not already cached at data_root.
     No synthetic fallback: if this fails, it raises and main() logs a
     loud, clear error before letting the process exit non-zero - per
     project policy, a run is either real data or it doesn't run."""
-    from torch.utils.data import Subset
-    from torchvision import datasets, transforms
-
-    transform = transforms.Compose([transforms.ToTensor()])
-    full_train = datasets.FashionMNIST(root=data_root, train=True, download=True, transform=transform)
-    subset = Subset(full_train, range(min(subset_size, len(full_train))))
-    log_event(f"Loaded real Fashion-MNIST subset ({len(subset)} images) from {data_root}")
+    subset = _load_split(dataset, True, subset_size, data_root)
+    log_event(f"Loaded real {dataset} subset ({len(subset)} images) from {data_root}")
     return subset
 
 
-def _load_val_dataset(val_size: int, data_root: str):
-    """Held-out validation images from Fashion-MNIST's official test split,
+def _load_val_dataset(val_size: int, data_root: str, dataset: str = "fashion_mnist"):
+    """Held-out validation images from the dataset's official test split,
     so the monitored loss is never computed on training images."""
-    from torch.utils.data import Subset
-    from torchvision import datasets, transforms
-
-    full_test = datasets.FashionMNIST(root=data_root, train=False, download=True,
-                                      transform=transforms.Compose([transforms.ToTensor()]))
-    return Subset(full_test, range(min(val_size, len(full_test))))
+    return _load_split(dataset, False, val_size, data_root)
 
 
 def main():
@@ -112,7 +172,7 @@ def main():
     parser.add_argument("--subset-size", type=int, default=6000,
                          help="Keep this small - the point is a real but fast CPU run.")
     parser.add_argument("--data-root", default="/tmp/data",
-                         help="Where Fashion-MNIST is cached/downloaded to.")
+                         help="Where datasets are cached/downloaded to.")
     parser.add_argument("--workers", type=int, default=2,
                          help="DataLoader worker processes. 0 for background mode "
                               "(avoid extra processes competing for CPU), higher for turbo.")
@@ -132,6 +192,12 @@ def main():
     parser.add_argument("--val-size", type=int, default=2000,
                          help="Images from the official test split used for per-epoch "
                               "validation loss/accuracy. 0 disables validation.")
+    parser.add_argument("--dataset", choices=["fashion_mnist", "mnist", "cifar10"],
+                        default="fashion_mnist")
+    parser.add_argument("--arch", choices=["cnn", "mlp"], default="cnn",
+                        help="cnn: two-conv CNN (three-conv for CIFAR-10); mlp: 256-128 MLP.")
+    parser.add_argument("--optimizer", choices=["adam", "sgd"], default="adam",
+                        help="sgd uses momentum 0.9.")
     parser.add_argument("--seed", type=int, default=None,
                          help="Seed torch's RNG (weights init + shuffling) for reproducible runs.")
     args = parser.parse_args()
@@ -166,6 +232,39 @@ def main():
             x = F.relu(self.fc1(x))
             return self.fc2(x)
 
+    class CifarCNN(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(3, 16, 3, padding=1)
+            self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
+            self.conv3 = nn.Conv2d(32, 64, 3, padding=1)
+            self.fc1 = nn.Linear(64 * 4 * 4, 128)
+            self.fc2 = nn.Linear(128, 10)
+
+        def forward(self, x):
+            x = F.max_pool2d(F.relu(self.conv1(x)), 2)
+            x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+            x = F.max_pool2d(F.relu(self.conv3(x)), 2)
+            x = F.relu(self.fc1(x.flatten(1)))
+            return self.fc2(x)
+
+    class MLP(nn.Module):
+        def __init__(self, in_features: int):
+            super().__init__()
+            self.fc1 = nn.Linear(in_features, 256)
+            self.fc2 = nn.Linear(256, 128)
+            self.fc3 = nn.Linear(128, 10)
+
+        def forward(self, x):
+            x = F.relu(self.fc1(x.flatten(1)))
+            x = F.relu(self.fc2(x))
+            return self.fc3(x)
+
+    def build_model():
+        if args.arch == "mlp":
+            return MLP(3 * 32 * 32 if args.dataset == "cifar10" else 28 * 28)
+        return CifarCNN() if args.dataset == "cifar10" else SmallCNN()
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log_event(f"Training device: {device}")
     if device.type == "cpu" and shutil.which("nvidia-smi") is not None:
@@ -178,11 +277,12 @@ def main():
         )
 
     try:
-        dataset = _load_dataset(args.subset_size, args.data_root)
-        val_dataset = _load_val_dataset(args.val_size, args.data_root) if args.val_size > 0 else None
+        dataset = _load_dataset(args.subset_size, args.data_root, args.dataset)
+        val_dataset = (_load_val_dataset(args.val_size, args.data_root, args.dataset)
+                       if args.val_size > 0 else None)
     except Exception as exc:
         log_event(
-            f"FATAL: could not load real Fashion-MNIST ({exc.__class__.__name__}: {exc}). "
+            f"FATAL: could not load real {args.dataset} ({exc.__class__.__name__}: {exc}). "
             f"No synthetic fallback by design - check network access to download it, or "
             f"pre-populate --data-root ({args.data_root}) with the dataset."
         )
@@ -205,16 +305,19 @@ def main():
         model.train()
         return loss_sum / total, correct / total
 
-    model = SmallCNN().to(device)
+    model = build_model().to(device)
     lr = args.lr
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    if args.optimizer == "sgd":
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     use_amp = args.amp and device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     if args.amp and not use_amp:
         log_event("--amp requested but no CUDA device available - training at normal precision")
 
-    log_event(f"Starting training: {args.epochs} epochs, batch_size={args.batch_size}, "
+    log_event(f"Starting training: {args.dataset}/{args.arch}/{args.optimizer}, {args.epochs} epochs, batch_size={args.batch_size}, "
               f"initial_lr={lr}, workers={args.workers}, amp={use_amp}, "
               f"cpu_threads={args.cpu_threads or 'default'}, throttle_ms={args.throttle_ms}")
 

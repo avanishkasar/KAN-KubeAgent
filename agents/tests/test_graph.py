@@ -40,7 +40,7 @@ def test_graph_runs_end_to_end_and_logs_every_decision():
     assert len(state["audit_log"]) >= 1
     for entry in state["audit_log"]:
         assert entry["decision"] in ("continue", "adjust_lr", "early_stop")
-        assert entry["outcome"] in ("NO_OP", "LR_ADJUSTED", "EARLY_STOPPED")
+        assert entry["outcome"] in ("NO_OP", "LR_ADJUSTED", "LR_ADJUST_DEFERRED", "EARLY_STOPPED")
         assert entry["gate_formula"].startswith("stop_score =")
 
 

@@ -36,7 +36,7 @@ Write-Host "Installing dependencies (this only downloads what's missing)..."
 
 if (-not (Test-Path "kan_gate\checkpoints\kan_gate_config.yml")) {
     Write-Host "No KAN gate checkpoint found - training one on the bundled real learning curves (one-time)..."
-    & $VenvPython -m kan_gate.train --curves experiments\data\curves.jsonl
+    & $VenvPython -m kan_gate.train --curves (Get-ChildItem experiments\data\curves*.jsonl).FullName
 }
 
 Write-Host "Starting dashboard server in the background (survives this window closing)..."

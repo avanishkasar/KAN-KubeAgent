@@ -6,7 +6,12 @@ intervention, and records every epoch's train loss, gradient norm,
 validation loss/accuracy and wall-clock time. These full curves are what
 experiments/benchmark.py replays every stopping policy against.
 
-    python -m experiments.collect_curves --epochs 40 --parallel 2
+Four real workloads are defined (WORKLOADS below). fmnist_cnn is the
+workload the live dashboard runs; the other three differ in dataset,
+architecture or optimiser and exist to test whether a gate transfers to
+training runs it has never seen.
+
+    python -m experiments.collect_curves --workload fmnist_cnn --epochs 40 --parallel 2
 """
 from __future__ import annotations
 
@@ -21,19 +26,33 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAINING_SCRIPT = REPO_ROOT / "training" / "fashion_mnist_cnn.py"
-DEFAULT_OUT = REPO_ROOT / "experiments" / "data" / "curves.jsonl"
+DATA_DIR = REPO_ROOT / "experiments" / "data"
 
-LRS = [1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2]
+ADAM_LRS = [1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2]
+SGD_LRS = [1e-3, 3e-3, 1e-2, 3e-2, 1e-1, 3e-1]
 BATCH_SIZES = [64, 256]
 SEEDS = [0, 1, 2]
 
+# name -> (training-script arguments, learning-rate grid)
+WORKLOADS = {
+    "fmnist_cnn": ([], ADAM_LRS),
+    "mnist_cnn": (["--dataset", "mnist"], ADAM_LRS),
+    "cifar10_cnn": (["--dataset", "cifar10"], ADAM_LRS),
+    "fmnist_mlp_sgd": (["--arch", "mlp", "--optimizer", "sgd"], SGD_LRS),
+}
+
+
+def curves_path(workload: str) -> Path:
+    """fmnist_cnn keeps its original file name, collected first."""
+    return DATA_DIR / ("curves.jsonl" if workload == "fmnist_cnn" else f"curves_{workload}.jsonl")
+
 
 def run_one(lr: float, batch_size: int, seed: int, epochs: int, subset: int,
-            val_size: int, threads: int) -> dict:
+            val_size: int, threads: int, extra_args: list[str] | None = None) -> dict:
     cmd = [sys.executable, str(TRAINING_SCRIPT), "--epochs", str(epochs), "--lr", str(lr),
            "--batch-size", str(batch_size), "--subset-size", str(subset),
            "--val-size", str(val_size), "--seed", str(seed), "--workers", "0",
-           "--cpu-threads", str(threads)]
+           "--cpu-threads", str(threads), *(extra_args or [])]
     start = time.time()
     out = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO_ROOT))
     epochs_log = []
@@ -57,26 +76,31 @@ def run_one(lr: float, batch_size: int, seed: int, epochs: int, subset: int,
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workload", choices=sorted(WORKLOADS), default="fmnist_cnn")
+    parser.add_argument("--seeds", type=int, nargs="+", default=SEEDS)
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--subset-size", type=int, default=4000)
     parser.add_argument("--val-size", type=int, default=2000)
     parser.add_argument("--parallel", type=int, default=2)
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
+    extra_args, lrs = WORKLOADS[args.workload]
+    args.out = args.out or curves_path(args.workload)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     done = set()
     if args.out.exists():
         done = {json.loads(l)["run_id"] for l in args.out.read_text().splitlines() if l.strip()}
 
-    grid = [(lr, bs, s) for lr, bs, s in itertools.product(LRS, BATCH_SIZES, SEEDS)
+    grid = [(lr, bs, s) for lr, bs, s in itertools.product(lrs, BATCH_SIZES, args.seeds)
             if f"lr{lr:g}_bs{bs}_s{s}" not in done]
     print(f"{len(done)} runs already collected, {len(grid)} to go", flush=True)
     threads = max(1, 4 // args.parallel)
 
     def job(cfg):
         lr, bs, s = cfg
-        rec = run_one(lr, bs, s, args.epochs, args.subset_size, args.val_size, threads)
+        rec = run_one(lr, bs, s, args.epochs, args.subset_size, args.val_size, threads, extra_args)
+        rec["workload"] = args.workload
         with args.out.open("a") as f:
             f.write(json.dumps(rec) + "\n")
         best = min(rec["val_loss"])

@@ -2,7 +2,7 @@
 
 Three data sources, in order of preference:
 
-  --curves PATH        real learning curves collected by
+  --curves PATH...     real learning curves collected by
                        experiments/collect_curves.py, labeled in hindsight
                        (kan_gate/hindsight.py). This is how the shipped
                        checkpoint is trained.
@@ -122,8 +122,9 @@ def main():
     src = parser.add_mutually_exclusive_group()
     src.add_argument("--synthetic", action="store_true",
                      help="Synthetic curves + reference-policy labels (baseline/testing).")
-    src.add_argument("--curves", type=Path, default=None,
-                     help="Real learning curves (experiments/data/curves.jsonl), hindsight-labeled.")
+    src.add_argument("--curves", type=Path, nargs="+", default=None,
+                     help="Real learning-curve files (experiments/data/curves*.jsonl), "
+                          "hindsight-labeled. The shipped checkpoint uses all four workloads.")
     parser.add_argument("--real-data-dir", type=Path, default=Path("kan_gate/data/real_runs"),
                         help="Harvested live runs, hindsight-labeled (default source).")
     parser.add_argument("--tolerance", type=float, default=DEFAULT_TOLERANCE,
@@ -137,8 +138,9 @@ def main():
         print("[kan_gate.train] Synthetic curves, reference-policy labels (baseline/testing).")
         rows = build_synthetic_dataset()
     elif args.curves:
-        rows = load_curves_dataset(args.curves, tolerance=args.tolerance)
-        print(f"[kan_gate.train] Real curves from {args.curves}, hindsight labels "
+        rows = [row for path in args.curves
+                for row in load_curves_dataset(path, tolerance=args.tolerance)]
+        print(f"[kan_gate.train] Real curves from {', '.join(map(str, args.curves))}, hindsight labels "
               f"(tolerance={args.tolerance}).")
     else:
         if not args.real_data_dir.exists():

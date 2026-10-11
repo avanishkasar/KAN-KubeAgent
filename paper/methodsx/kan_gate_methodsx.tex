@@ -1,0 +1,70 @@
+%% MethodsX method article.
+%% Build: pdflatex kan_gate_methodsx && bibtex kan_gate_methodsx && pdflatex kan_gate_methodsx && pdflatex kan_gate_methodsx
+%% Every measured value is a macro from generated/numbers.tex or a table from generated/,
+%% produced by `python -m experiments.paper_methodsx` from the experiment outputs.
+\documentclass[preprint,12pt]{elsarticle}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf}
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=4pt}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\urlstyle{same}
+
+\definecolor{kblue}{HTML}{2A78D6}
+
+\input{generated/numbers.tex}
+\newcommand{\R}[3]{\csname R@#1@#2@#3\endcsname}       % offline results: protocol, policy, metric
+\newcommand{\W}[4]{\csname W@#1@#2@#3@#4\endcsname}    % per workload
+\newcommand{\T}[4]{\csname T@#1@#2@#3@#4\endcsname}    % paired tests
+\newcommand{\D}[2]{\csname D@#1@#2\endcsname}          % workload description
+\newcommand{\A}[2]{\csname A@#1@#2\endcsname}          % feature ablation
+\newcommand{\Sw}[2]{\csname S@#1@#2\endcsname}         % tolerance sweep
+\newcommand{\C}[2]{\csname C@#1@#2\endcsname}          % closed loop
+\newcommand{\X}[1]{\csname #1\endcsname}               % scalar
+
+\journal{MethodsX}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Hindsight-supervised symbolic Kolmogorov--Arnold gates for auditable early stopping and learning-rate control of neural network training}
+
+\author[apsit]{Avanish Kasar\corref{cor1}}
+\ead{avanishkasar57@gmail.com}
+\author[apsit]{Rupali Biradar}
+\author[apsit]{Viverun}
+\cortext[cor1]{Corresponding author.}
+\affiliation[apsit]{organization={A. P. Shah Institute of Technology},
+  city={Thane},
+  state={Maharashtra},
+  country={India}}
+
+\input{sections/abstract.tex}
+
+\end{frontmatter}
+
+\input{sections/spec_table.tex}
+\input{sections/background.tex}
+\input{sections/method.tex}
+\input{sections/validation.tex}
+\input{sections/limitations.tex}
+\input{sections/statements.tex}
+
+\bibliographystyle{elsarticle-num}
+\bibliography{refs}
+
+\end{document}
