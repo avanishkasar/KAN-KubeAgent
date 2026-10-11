@@ -84,7 +84,16 @@ def m(name: str, value) -> None:
 
 def f1(x): return f"{x:.1f}"
 def f2(x): return f"{x:.2f}"
+def sci(x):
+    """LaTeX number for math mode: plain decimals down to 0.01, else a x 10^-k."""
+    if x >= 0.01:
+        return f"{x:.2f}"
+    mant, exp = f"{x:.1e}".split("e")
+    return f"{mant}\\times10^{{{int(exp)}}}"
+
+
 def pv(p): return "$<$0.001" if p < 0.001 else f"{p:.3f}"
+def pm(p): return "<0.001" if p < 0.001 else f"={p:.3f}"  # for "$p\\T{..}{p}$" in running text
 
 
 def save(fig, name):
@@ -128,7 +137,7 @@ def offline(g: dict) -> None:
             mk = "regret" if metric == "regret" else "stop"
             for other, t in comp.items():
                 pre = f"T@{proto}@{KEY_OF[other]}@{mk}@"
-                m(pre + "p", pv(t["p_holm"]))
+                m(pre + "p", pm(t["p_holm"]))
                 m(pre + "diff", f2(t["median_diff"]) if mk == "regret" else f1(t["median_diff"]))
 
     for w, s in g["workloads"].items():
@@ -139,10 +148,14 @@ def offline(g: dict) -> None:
         m(pre + "late", f1(100 * s["frac_best_in_last_5"]))
         m(pre + "sec", f2(s["epoch_seconds_mean"]))
 
+    pr = g["per_run"]["lowo"][OURS]
+    s2 = [statistics.mean(v["stop_epoch"]) for k, v in pr.items() if k.endswith("_s2")]
+    m("offlineSeedTwoSaved", f1(100 * (1 - sum(s2) / (cfg["budget_epochs"] * len(s2)))))
+
     it = g["interpretability"]
     m("nGates", it["n_gates"])
-    m("faithMax", f"{it['faithfulness_max_abs']:.1e}".replace("e-0", r"\times10^{-").replace("e-", r"\times10^{-") + "}")
-    m("faithMed", f"{it['faithfulness_median']:.1e}".replace("e-0", r"\times10^{-").replace("e-", r"\times10^{-") + "}")
+    m("faithMax", sci(it["faithfulness_max_abs"]))
+    m("faithMed", sci(it["faithfulness_median"]))
     m("termsMed", f"{it['formula_terms_median']:g}")
     m("termsMax", f"{it['formula_terms_max']:g}")
     m("edgesMed", f"{it['active_edges_median']:g}")
@@ -298,15 +311,16 @@ def closed_loop() -> dict:
     rows_lowo, rows_guard = [], []
     for key, cs in out.items():
         pre = f"C@{key}@"
-        m(pre + "used", cs["used"]); m(pre + "budget", cs["budget"]); m(pre + "n", cs["n"])
+        m(pre + "used", f"{cs['used']:,}".replace(",", "{,}")); m(pre + "budget", f"{cs['budget']:,}".replace(",", "{,}")); m(pre + "n", cs["n"])
         m(pre + "saved", f1(cs["saved"])); m(pre + "relmed", f2(cs["rel_median"]))
         m(pre + "relmean", f2(cs["rel_mean"])); m(pre + "relmax", f1(cs["rel_max"]))
         m(pre + "relmin", f1(cs["rel_min"]))
-        m(pre + "worse", cs["worse2"]); m(pre + "better", cs["better2"]); m(pre + "p", pv(cs["p"]))
+        m(pre + "worse", cs["worse2"]); m(pre + "better", cs["better2"]); m(pre + "p", pm(cs["p"]))
         m(pre + "adj", cs["adj_total"]); m(pre + "adjmax", cs["adj_max"]); m(pre + "deferred", cs["deferred"])
         m(pre + "stopped", cs["stopped"]); m(pre + "acc", f2(cs["acc_mean_pp"]))
-        row = (f"{cs['label']} & {cs['n']} & {cs['used']}/{cs['budget']} & {f1(cs['saved'])} & "
-               f"{f2(cs['rel_median'])} & {f1(cs['rel_min'])} / {f1(cs['rel_max'])} & "
+        thou = lambda v: f"{v:,}".replace(",", "{,}")  # noqa: E731
+        row = (f"{cs['label']} & {cs['n']} & {thou(cs['used'])}/{thou(cs['budget'])} & {f1(cs['saved'])} & "
+               f"${f2(cs['rel_median'])}$ & ${f1(cs['rel_min'])}$ / ${f1(cs['rel_max'])}$ & "
                f"{cs['worse2']} & {pv(cs['p'])} & {cs['adj_total']} ({cs['adj_max']}) \\\\")
         if key.startswith("lowo"):
             if key == "lowoall":
@@ -332,7 +346,7 @@ def deployed_gate() -> KANGate:
     runs = [r for w in WORKLOADS for r in B.load_runs(curves_path(w))]
     X = np.concatenate([r["X"] for r in runs])
     info = B.kan_interpretability(B.KANScorer(gate, "deployed"), X)
-    m("depFaith", f"{info['faithfulness_max_abs']:.1e}".replace("e-0", r"\times10^{-").replace("e-", r"\times10^{-") + "}")
+    m("depFaith", sci(info["faithfulness_max_abs"]))
     m("depTerms", len(sympy.Add.make_args(sympy.expand(expr))))
     m("depRows", f"{len(X):,}".replace(",", "{,}"))
     subs = {sympy.Symbol(n): sympy.Symbol(FEATURE_SYMBOL[n]) for n in FEATURE_NAMES}
@@ -442,7 +456,7 @@ def fig_edges(gate: KANGate) -> None:
 
 
 def fig_closed(cl: dict) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(6.8, 2.6))
+    fig, axes = plt.subplots(1, 2, figsize=(6.8, 3.0), gridspec_kw={"width_ratios": [1.15, 1]})
     ax = axes[0]
     keys = ["lowofmnist", "lowomnist", "lowocifar", "lowomlpsgd"]
     colors = [BLUE, ORANGE, AQUA, VIOLET]
@@ -454,23 +468,23 @@ def fig_closed(cl: dict) -> None:
     ax.set_xlabel("epochs used of 40")
     ax.set_ylabel("change in best val. loss vs.\nuncontrolled run (%)")
     ax.set_title("Unseen-workload gates, with guard", loc="left")
-    ax.legend(fontsize=6, loc="upper left")
+    ax.legend(fontsize=6, loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=2)
     ax = axes[1]
-    pairs = [("fmnistnoguard", "fmnistguard", "Fashion-MNIST\nwithin-workload gate"),
-             ("cifarnoguard", "lowocifar", "CIFAR-10\nunseen-workload gate")]
+    pairs = [("fmnistnoguard", "fmnistguard", "Fashion-MNIST\n(within-workload gate)"),
+             ("cifarnoguard", "lowocifar", "CIFAR-10\n(unseen-workload gate)")]
     xs = np.arange(len(pairs))
-    for off, idx, color, label in ((-0.18, 0, GRAY, "no guard"), (0.18, 1, BLUE, "guard")):
-        vals = [[x["n_adjust_lr"] for x in cl[p[idx]]["data"]["summary"]] for p in pairs]
+    for off, idx, color, label in ((-0.19, 0, GRAY, "no guard"), (0.19, 1, BLUE, "guard")):
+        totals = [cl[p[idx]]["adj_total"] for p in pairs]
         worst = [cl[p[idx]]["rel_max"] for p in pairs]
-        ax.bar(xs + off, [sum(v) for v in vals], width=0.34, color=color, label=f"{label}: LR halvings")
-        for x, wv in zip(xs + off, worst):
-            ax.annotate(f"worst {wv:+.1f}%", (x, 0), xytext=(0, 3), textcoords="offset points",
-                        ha="center", fontsize=6, color="white" if color == BLUE else INK, rotation=90,
-                        va="bottom")
-    ax.set_xticks(xs, [p[2] for p in pairs])
-    ax.set_ylabel("learning-rate halvings (12 runs)")
+        ax.bar(xs + off, totals, width=0.36, color=color, label=label)
+        for x, t, wv in zip(xs + off, totals, worst):
+            ax.annotate(f"{t}\nworst {wv:+.1f}%", (x, t), xytext=(0, 3), textcoords="offset points",
+                        ha="center", va="bottom", fontsize=6, color=INK)
+    ax.set_xticks(xs, [p[2] for p in pairs], fontsize=6.5)
+    ax.set_ylabel("learning-rate halvings in 12 runs")
+    ax.set_ylim(0, max(cl[p[0]]["adj_total"] for p in pairs) * 1.3)
     ax.set_title("Effect of the learning-rate guard", loc="left")
-    ax.legend(fontsize=6, loc="upper right")
+    ax.legend(fontsize=6.5, loc="upper left")
     ax.grid(axis="x", visible=False)
     fig.tight_layout()
     save(fig, "closed_loop")

@@ -8,12 +8,13 @@ We recorded \nRuns{} complete training runs on four workloads (Table~\ref{tab:wo
 \centering
 \caption{The four workloads. Each has 36 uncontrolled runs (6 learning rates $\times$ 2 batch sizes $\times$ 3 seeds, 40 epochs). Accuracy is the median over runs of the best validation accuracy; ``best epoch'' is the median epoch of minimum validation loss; ``late'' is the share of runs whose minimum falls in the last five epochs; time is the mean wall-clock time per epoch on two CPU threads.}
 \label{tab:workloads}
-\small
+\footnotesize
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{llllrrrr}
 \toprule
-Dataset & Model & Optimiser & Learning rates & Acc.\ (\%) & Best epoch & Late (\%) & s/epoch \\
+Dataset & Model & Optimiser & Learning rates & Acc.\ (\%) & Best ep. & Late (\%) & s/ep. \\
 \midrule
-\input{generated/table_workloads.tex}
+\tabinput{generated/table_workloads.tex}
 \bottomrule
 \end{tabular}
 \end{table}

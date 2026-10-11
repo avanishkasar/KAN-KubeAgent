@@ -1,0 +1,1 @@
+stop_score = 72.2382637544988*epochs_since_improvement - 14.606076267282*gpu_hours_remaining_vs_budget - 19.3003537698232*gradient_trend + 21.8615516240069*loss_plateau_score + 20.3255447734662*lr_decay_benefit - 3.76989701985024*sin(1.48567986488342*lr_decay_benefit + 6.50647974014282) + 34.9916445209549

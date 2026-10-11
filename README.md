@@ -50,7 +50,15 @@ Run the tests with `python -m pytest agents/tests kan_gate/tests`.
 
 ## Results
 
-On 36 real Fashion-MNIST runs (6 learning rates, 2 batch sizes, 3 seeds, 40-epoch budget) with seed-grouped cross-validation, the hindsight-trained gate saves 31.0% of the epoch budget at 0.20% mean regret in best validation loss. The same gate trained on rule labels saves 4.4%. A hindsight oracle reaches 0.18% regret. In closed-loop control of 12 held-out live runs the system saved 37.1% of epochs with no significant change in best validation loss. A linear gate trained on the same labels performs comparably, so the KAN's contribution is an exact, readable, non-linear decision formula rather than higher accuracy. Limitations (one small model, intervention cooldown missing, Kubeflow client untested on a live cluster) are listed in the paper.
+All results come from real training runs; no synthetic data enters any of them.
+
+- Data: 144 complete, uncontrolled runs on four workloads (Fashion-MNIST CNN, MNIST CNN, CIFAR-10 CNN, all with Adam; Fashion-MNIST MLP with SGD), each 6 learning rates x 2 batch sizes x 3 seeds, 40 epochs.
+- Unseen workloads (gate trained on three workloads, tested on the fourth): the KAN gate saves 25.0% of epochs at 0.21% mean regret in best validation loss, with 1.9% of runs stopped prematurely. That is the lowest regret of every learned gate. The same KAN trained on hand-written rule labels saves only 15.4%.
+- A patience rule of 8 epochs performs comparably (29.3% saved, 0.22% regret), and a linear gate on the same labels sits close to the same trade-off curve. The KAN's contribution is an exact, readable decision formula that transfers without per-workload tuning and also controls the learning rate. It does not stop runs better than these simpler rules.
+- Live closed-loop control of 48 runs on unseen workloads: 1,502 of 1,920 epochs used (21.8% saved), with no significant change in best validation loss (Wilcoxon p = 0.51).
+- Learning-rate guard: without it the controller halved the learning rate up to 12 times in one run. With it, at most 3 halvings per run, and the worst single-run loss fell from +11.1% to +8.1% (Fashion-MNIST) and from +4.2% to +2.8% (CIFAR-10).
+
+The full write-up is the MethodsX article in `paper/methodsx/` (PDF: `paper/methodsx/kan_gate_methodsx.pdf`). Every number, table and figure in it is regenerated from the experiment outputs by `python -m experiments.paper_methodsx`. The earlier IEEE conference draft, which covers only the Fashion-MNIST workload, is in `paper/`.
 
 ## Problem statement
 
@@ -109,14 +117,15 @@ After training, every edge of the KAN is fixed to a symbolic function, so the fo
 ## Experiments and paper
 
 ```
-python -m experiments.collect_curves      # 36 real Fashion-MNIST runs, full learning curves
-python -m experiments.benchmark           # offline replay of every stopping policy, 3-fold CV by seed
-python -m experiments.closed_loop         # the full agent + gate system controlling real runs
-python -m experiments.figures             # paper figures from the results above
-python -m kan_gate.train --curves experiments/data/curves.jsonl   # train the deployed gate
+python -m experiments.collect_curves --workload fmnist_cnn   # also mnist_cnn, cifar10_cnn, fmnist_mlp_sgd
+python -m experiments.generalization      # all policies, within-workload CV and leave-one-workload-out
+python -m experiments.benchmark           # the original single-workload benchmark
+python -m experiments.closed_loop --workload cifar10_cnn --gate lowo   # live control; --no-guard to disable the LR guard
+python -m kan_gate.train --curves experiments/data/curves*.jsonl       # train the deployed gate on all workloads
+python -m experiments.paper_methodsx      # numbers, tables and figures of the MethodsX article
 ```
 
-Results land in experiments/results/. The paper (IEEE conference format) is in paper/, with its PDF at paper/kan_kubeagent.pdf.
+Results land in experiments/results/. The MethodsX article is in paper/methodsx/ and the earlier IEEE conference draft in paper/.
 
 ## Repository structure
 
@@ -175,7 +184,7 @@ See `research/literature/` for full annotated notes.
 | 4: Agent layer | LangGraph agents observing the real TrainJob |
 | 5: Integration | Wire agents, KAN gate, and real TrainJob control actions together |
 | 6: Dashboard | Done: live control room, KAN network view, research view |
-| 7: Paper | Draft complete (paper/); next: cluster validation and larger models |
+| 7: Paper | MethodsX article complete (paper/methodsx/); next: cluster validation and larger models |
 
 No fixed hard deadline is set yet; phases are sequenced by dependency, not calendar weeks.
 

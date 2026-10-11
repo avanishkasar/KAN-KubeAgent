@@ -6,8 +6,9 @@ The method produces a \emph{gate}: a small function that reads five causal summa
 
 \begin{figure}[t]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[font=\footnotesize, node distance=4mm and 5mm,
-  box/.style={draw=black!55, rounded corners=2pt, minimum height=12mm, text width=24mm, align=center, inner sep=3pt, fill=white},
+  box/.style={draw=black!55, rounded corners=2pt, minimum height=17mm, text width=24mm, align=center, inner sep=3pt, fill=white},
   key/.style={box, draw=kblue, line width=0.9pt, fill=kblue!7},
   arr/.style={-{Latex[length=2mm]}, black!70, line width=0.6pt}]
 \node[box] (s1) {\textbf{1. Record}\\uncontrolled runs:\\val.\ loss, grad.\ norm};
@@ -18,7 +19,7 @@ The method produces a \emph{gate}: a small function that reads five causal summa
 \draw[arr] (s1) -- (s2); \draw[arr] (s2) -- (s3); \draw[arr] (s3) -- (s4); \draw[arr] (s4) -- (s5);
 \node[below=3mm of s4, text width=60mm, align=center, font=\scriptsize, text=black!70] (out) {output: $s=f(x_1,\dots,x_5)$, a closed-form expression\\that is executed as written};
 \draw[arr, dashed] (s4) -- (out);
-\end{tikzpicture}
+\end{tikzpicture}}
 \caption{The five steps of the method. Steps 3 and 4 (highlighted) are the customisation of the original KAN method; steps 1, 2 and 5 adapt standard early-stopping practice.}
 \label{fig:overview}
 \end{figure}
@@ -58,7 +59,7 @@ The gate is a KAN of width $[5,3,1]$ with B-spline edges (grid size 5, order $k=
 s(\mathbf{x})=\sum_{j=1}^{3}\phi^{(2)}_{j}\Big(\sum_{i=1}^{5}\phi^{(1)}_{j,i}(x_i)\Big).
 \label{eq:kan}
 \end{equation}
-Fitting regresses $s$ on the targets $y_t$ with mean squared error, using Adam for 200 steps with an $\ell_1$ sparsity penalty $\lambda=0.01$ and entropy penalty 2.0, an 80/20 split of the training decision points for monitoring, pruning of inactive nodes and edges, and a 40-step refit of the pruned network. Then every remaining edge function is replaced by the best-fitting function from the library $\{x, x^2, x^3, \sin\}$ with fitted affine parameters (\texttt{auto\_symbolic}), and the expression is expanded with SymPy. After this step the network computes exactly the extracted expression: the formula shown to an operator is the decision function, not an approximation of it. We verify this on every gate by evaluating the network and the formula on the same inputs (\emph{faithfulness}, reported in Method validation).
+Fitting regresses $s$ on the targets $y_t$ with mean squared error, using Adam for 200 steps with an $\ell_1$ sparsity penalty $\lambda=0.01$ and entropy penalty 2.0, an 80/20 split of the training decision points for monitoring, pruning of inactive nodes and edges, and a 40-step refit of the pruned network. Then every remaining edge function is replaced by the best-fitting function from the library $\{x, x^2, x^3, \sin\}$ with fitted affine parameters (\texttt{auto\_symbolic}), and the expression is expanded with SymPy. After this step the network computes the extracted expression, up to numerical precision: the formula shown to an operator is the decision function, not a post-hoc approximation of it. We verify this on every gate by evaluating the network and the formula on the same inputs (\emph{faithfulness}, reported in Method validation).
 
 The library is deliberately narrow. Exponentials, logarithms and nested compositions fit slightly better but produce expressions that are not readable at a glance, which defeats the purpose; the width $[5,3,1]$ is chosen for the same reason.
 
@@ -68,13 +69,44 @@ In the released controller (\texttt{KAN-KubeAgent}) a LangGraph pipeline observe
 A plateaued job keeps scoring in the adjust band, and an unguarded executor halves its learning rate at every decision point. We therefore add a \emph{learning-rate guard}: an adjustment is executed only if at least two decision points have passed since the previous one, and at most three times per job; a blocked adjustment is logged as deferred and the job continues unchanged. The effect of the guard is measured in closed-loop runs below.
 
 \subsection*{Step-by-step procedure}
+All commands are run from the root of the released repository.
 \begin{enumerate}
-\item Install Python 3.10 or newer and the dependencies: \texttt{pip install -r training/requirements.txt -r kan\_gate/requirements.txt -r agents/requirements.txt -r dashboard/backend/requirements.txt}. A GPU is optional; every experiment here ran on four CPU cores.
-\item Record curves for each workload (Step 1):\\ \texttt{python -m experiments.collect\_curves --workload fmnist\_cnn --epochs 40 --parallel 2}\\ and likewise for \texttt{mnist\_cnn}, \texttt{cifar10\_cnn} and \texttt{fmnist\_mlp\_sgd}. Each run is a subprocess of the same training script the live controller uses.
-\item Evaluate (Steps 2 to 4 inside every fold): \texttt{python -m experiments.generalization} (both protocols, all baselines, sweeps, ablations) and \texttt{python -m experiments.benchmark} (the original single-workload benchmark).
-\item Run closed-loop control: \texttt{python -m experiments.closed\_loop --workload <w> --gate lowo} for each workload, \texttt{--no-guard} for the unguarded executor.
-\item Train the deployable gate on all recorded curves: \texttt{python -m kan\_gate.train --curves experiments/data/curves*.jsonl}. The learned formula is printed and the checkpoint saved.
-\item Start the controller and dashboard with \texttt{./start.sh} (Linux, macOS) or \texttt{.\textbackslash start.ps1} (Windows) and open \url{http://localhost:8000}.
-\item Regenerate the tables, numbers and figures of this article: \texttt{python -m experiments.paper\_methodsx}.
+\item Install Python 3.10 or newer and the dependencies. A GPU is optional; every experiment reported here ran on four CPU cores.
+{\footnotesize
+\begin{verbatim}
+pip install -r training/requirements.txt \
+            -r kan_gate/requirements.txt \
+            -r agents/requirements.txt \
+            -r dashboard/backend/requirements.txt
+\end{verbatim}}
+\item Record uncontrolled learning curves for each workload (Step 1). Each run is a subprocess of the same training script that the live controller launches.
+{\footnotesize
+\begin{verbatim}
+for w in fmnist_cnn mnist_cnn cifar10_cnn fmnist_mlp_sgd; do
+  python -m experiments.collect_curves --workload $w \
+         --epochs 40 --parallel 2
+done
+\end{verbatim}}
+\item Evaluate all policies with both protocols, including the sweeps and ablations (Steps 2 to 4 are run inside every fold):
+{\footnotesize
+\begin{verbatim}
+python -m experiments.generalization
+\end{verbatim}}
+\item Run closed-loop control of live training for each workload; add \texttt{-{}-no-guard} to disable the learning-rate guard:
+{\footnotesize
+\begin{verbatim}
+python -m experiments.closed_loop --workload cifar10_cnn --gate lowo
+\end{verbatim}}
+\item Train the deployable gate on all recorded curves. The learned formula is printed and the checkpoint is saved:
+{\footnotesize
+\begin{verbatim}
+python -m kan_gate.train --curves experiments/data/curves*.jsonl
+\end{verbatim}}
+\item Start the controller and its dashboard with \texttt{./start.sh} on Linux or macOS, or with \texttt{.\textbackslash start.ps1} in Windows PowerShell, and open \url{http://localhost:8000}.
+\item Regenerate every number, table and figure of this article:
+{\footnotesize
+\begin{verbatim}
+python -m experiments.paper_methodsx
+\end{verbatim}}
 \end{enumerate}
-To apply the method to a new kind of job, repeat steps 2 to 5 with curves of that job; to use it without retraining, use a gate trained on other workloads, which is what the leave-one-workload-out protocol below evaluates.
+To apply the method to a new kind of job, record curves of that job and train a gate on them (procedure steps 2 and 5), after checking with step 3 that the gate's trade-off is acceptable; to use a gate without new curves, use one trained on other workloads, which is the situation the leave-one-workload-out protocol below evaluates.

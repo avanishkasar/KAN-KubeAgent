@@ -1,0 +1,187 @@
+\begin{thebibliography}{10}
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{\texttt{#1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\expandafter\ifx\csname href\endcsname\relax
+  \def\href#1#2{#2} \def\path#1{#1}\fi
+
+\bibitem{schwartz2020greenai}
+R.~Schwartz, J.~Dodge, N.~A. Smith, O.~Etzioni, Green {AI}, Communications of
+  the ACM 63~(12) (2020).
+
+\bibitem{prechelt2012early}
+L.~Prechelt, Early stopping --- but when?, in: G.~Montavon, G.~B. Orr, K.-R.
+  M{\"u}ller (Eds.), Neural Networks: Tricks of the Trade, 2nd Edition,
+  Springer, 2012.
+
+\bibitem{golovin2017vizier}
+D.~Golovin, B.~Solnik, S.~Moitra, G.~Kochanski, J.~Karro, D.~Sculley, Google
+  {V}izier: A service for black-box optimization, in: Proceedings of the 23rd
+  ACM SIGKDD International Conference on Knowledge Discovery and Data Mining
+  (KDD), 2017.
+
+\bibitem{li2018hyperband}
+L.~Li, K.~Jamieson, G.~DeSalvo, A.~Rostamizadeh, A.~Talwalkar, Hyperband: A
+  novel bandit-based approach to hyperparameter optimization, Journal of
+  Machine Learning Research 18~(185) (2018) 1--52.
+
+\bibitem{li2020asha}
+L.~Li, K.~Jamieson, A.~Rostamizadeh, E.~Gonina, J.~Ben-tzur, M.~Hardt,
+  B.~Recht, A.~Talwalkar, A system for massively parallel hyperparameter
+  tuning, in: Proceedings of Machine Learning and Systems (MLSys), Vol.~2,
+  2020.
+
+\bibitem{falkner2018bohb}
+S.~Falkner, A.~Klein, F.~Hutter, {BOHB}: Robust and efficient hyperparameter
+  optimization at scale, in: Proceedings of the 35th International Conference
+  on Machine Learning (ICML), 2018, pp. 1437--1446.
+
+\bibitem{akiba2019optuna}
+T.~Akiba, S.~Sano, T.~Yanase, T.~Ohta, M.~Koyama, Optuna: A next-generation
+  hyperparameter optimization framework, in: Proceedings of the 25th ACM SIGKDD
+  International Conference on Knowledge Discovery and Data Mining (KDD), 2019.
+
+\bibitem{liaw2018tune}
+R.~Liaw, E.~Liang, R.~Nishihara, P.~Moritz, J.~E. Gonzalez, I.~Stoica, Tune: A
+  research platform for distributed model selection and training, {ICML} AutoML
+  Workshop; arXiv:1807.05118 (2018).
+
+\bibitem{george2020katib}
+J.~George, C.~Gao, R.~Liu, H.~G. Liu, Y.~Tang, R.~Pydipaty, A.~K. Saha, A
+  scalable and cloud-native hyperparameter tuning system, arXiv:2006.02085
+  (2020).
+
+\bibitem{domhan2015extrapolation}
+T.~Domhan, J.~T. Springenberg, F.~Hutter, Speeding up automatic hyperparameter
+  optimization of deep neural networks by extrapolation of learning curves, in:
+  Proceedings of the 24th International Joint Conference on Artificial
+  Intelligence (IJCAI), 2015.
+
+\bibitem{klein2017lcnet}
+A.~Klein, S.~Falkner, J.~T. Springenberg, F.~Hutter, Learning curve prediction
+  with {B}ayesian neural networks, in: International Conference on Learning
+  Representations (ICLR), 2017.
+
+\bibitem{adriaensen2023lcpfn}
+S.~Adriaensen, H.~Rakotoarison, S.~M{\"u}ller, F.~Hutter, Efficient {B}ayesian
+  learning curve extrapolation using prior-data fitted networks, in: Advances
+  in Neural Information Processing Systems (NeurIPS), 2023.
+
+\bibitem{zhang2023llmhpo}
+M.~R. Zhang, N.~Desai, J.~Bae, J.~Lorraine, J.~Ba, Using large language models
+  for hyperparameter optimization, {NeurIPS} Workshop on Foundation Models for
+  Decision Making; arXiv:2312.04528 (2023).
+
+\bibitem{liu2024agenthpo}
+S.~Liu, C.~Gao, Y.~Li, Large language model agent for hyper-parameter
+  optimization, arXiv:2402.01881 (2024).
+
+\bibitem{huang2024mlagentbench}
+Q.~Huang, J.~Vora, P.~Liang, J.~Leskovec, {MLAgentBench}: Evaluating language
+  agents on machine learning experimentation, in: Proceedings of the 41st
+  International Conference on Machine Learning (ICML), 2024.
+
+\bibitem{chan2025mlebench}
+J.~S. Chan, N.~Chowdhury, O.~Jaffe, J.~Aung, D.~Sherburn, E.~Mays, G.~Starace,
+  K.~Liu, L.~Maksin, T.~Patwardhan, A.~Madry, L.~Weng, {MLE}-bench: Evaluating
+  machine learning agents on machine learning engineering, in: International
+  Conference on Learning Representations (ICLR), 2025.
+
+\bibitem{yao2023react}
+S.~Yao, J.~Zhao, D.~Yu, N.~Du, I.~Shafran, K.~Narasimhan, Y.~Cao, {ReAct}:
+  Synergizing reasoning and acting in language models, in: International
+  Conference on Learning Representations (ICLR), 2023.
+
+\bibitem{rudin2019stop}
+C.~Rudin, Stop explaining black box machine learning models for high stakes
+  decisions and use interpretable models instead, Nature Machine Intelligence
+  1~(5) (2019) 206--215.
+
+\bibitem{liu2025kan}
+Z.~Liu, Y.~Wang, S.~Vaidya, F.~Ruehle, J.~Halverson, M.~Solja{\v{c}}i{\'c},
+  T.~Y. Hou, M.~Tegmark, {KAN}: {K}olmogorov-{A}rnold networks, in:
+  International Conference on Learning Representations (ICLR), 2025,
+  arXiv:2404.19756.
+
+\bibitem{liu2024kan2}
+Z.~Liu, P.~Ma, Y.~Wang, W.~Matusik, M.~Tegmark, {KAN} 2.0:
+  {K}olmogorov-{A}rnold networks meet science, arXiv:2408.10205 (2024).
+
+\bibitem{segel2023symbolic}
+S.~Segel, H.~Graf, A.~Tornede, B.~Bischl, M.~Lindauer, Symbolic explanations
+  for hyperparameter optimization, in: Proceedings of the Second International
+  Conference on Automated Machine Learning (AutoML), PMLR 224, 2023.
+
+\bibitem{zheng2022symbolicl2o}
+W.~Zheng, T.~Chen, T.-K. Hu, Z.~Wang, Symbolic learning to optimize: Towards
+  interpretability and scalability, in: International Conference on Learning
+  Representations (ICLR), 2022.
+
+\bibitem{singh2025kanrl}
+K.~Singh, S.~Marouani, A.~A. Sheikh, P.~T.~A. Quang, A.~Habrard, Interpretable
+  reinforcement learning for load balancing using {K}olmogorov-{A}rnold
+  networks, arXiv:2505.14459 (2025).
+
+\bibitem{yu2024kanormlp}
+R.~Yu, W.~Yu, X.~Wang, {KAN} or {MLP}: A fairer comparison, arXiv:2407.16674
+  (2024).
+
+\bibitem{alshiekh2018shielding}
+M.~Alshiekh, R.~Bloem, R.~Ehlers, B.~K{\"o}nighofer, S.~Niekum, U.~Topcu, Safe
+  reinforcement learning via shielding, in: Proceedings of the AAAI Conference
+  on Artificial Intelligence, Vol.~32, 2018.
+
+\bibitem{efron1993bootstrap}
+B.~Efron, R.~J. Tibshirani, An Introduction to the Bootstrap, Chapman \& Hall,
+  New York, 1993.
+
+\bibitem{wilcoxon1945}
+F.~Wilcoxon, Individual comparisons by ranking methods, Biometrics Bulletin
+  1~(6) (1945) 80--83.
+
+\bibitem{holm1979}
+S.~Holm, A simple sequentially rejective multiple test procedure, Scandinavian
+  Journal of Statistics 6~(2) (1979) 65--70.
+
+\bibitem{kolmogorov1957}
+A.~N. Kolmogorov, On the representation of continuous functions of many
+  variables by superposition of continuous functions of one variable and
+  addition, Doklady Akademii Nauk SSSR 114 (1957) 953--956.
+
+\bibitem{kingma2015adam}
+D.~P. Kingma, J.~Ba, Adam: A method for stochastic optimization, in:
+  International Conference on Learning Representations (ICLR), 2015.
+
+\bibitem{sutskever2013momentum}
+I.~Sutskever, J.~Martens, G.~Dahl, G.~Hinton, On the importance of
+  initialization and momentum in deep learning, in: Proceedings of the 30th
+  International Conference on Machine Learning (ICML), 2013, pp. 1139--1147.
+
+\bibitem{paszke2019pytorch}
+A.~Paszke, S.~Gross, F.~Massa, A.~Lerer, J.~Bradbury, G.~Chanan, T.~Killeen,
+  Z.~Lin, N.~Gimelshein, L.~Antiga, A.~Desmaison, A.~K{\"o}pf, E.~Yang,
+  Z.~DeVito, M.~Raison, A.~Tejani, S.~Chilamkurthy, B.~Steiner, L.~Fang,
+  J.~Bai, S.~Chintala, {PyTorch}: An imperative style, high-performance deep
+  learning library, in: Advances in Neural Information Processing Systems
+  (NeurIPS), Vol.~32, 2019.
+
+\bibitem{xiao2017fashion}
+H.~Xiao, K.~Rasul, R.~Vollgraf, {Fashion-MNIST}: A novel image dataset for
+  benchmarking machine learning algorithms, arXiv:1708.07747 (2017).
+
+\bibitem{lecun1998mnist}
+Y.~LeCun, L.~Bottou, Y.~Bengio, P.~Haffner, Gradient-based learning applied to
+  document recognition, Proceedings of the IEEE 86~(11) (1998) 2278--2324.
+
+\bibitem{krizhevsky2009cifar}
+A.~Krizhevsky, Learning multiple layers of features from tiny images, Technical
+  report, University of Toronto (2009).
+
+\bibitem{pedregosa2011sklearn}
+F.~Pedregosa, G.~Varoquaux, A.~Gramfort, V.~Michel, B.~Thirion, O.~Grisel,
+  M.~Blondel, P.~Prettenhofer, R.~Weiss, V.~Dubourg, J.~Vanderplas, A.~Passos,
+  D.~Cournapeau, M.~Brucher, M.~Perrot, {\'E}.~Duchesnay, Scikit-learn: Machine
+  learning in {P}ython, Journal of Machine Learning Research 12 (2011)
+  2825--2830.
+
+\end{thebibliography}

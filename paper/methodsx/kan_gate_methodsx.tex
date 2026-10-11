@@ -5,7 +5,9 @@
 \documentclass[preprint,12pt]{elsarticle}
 
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
+\usepackage{mathptmx}
+\usepackage[scaled=0.9]{helvet}
+\usepackage{courier}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
@@ -15,17 +17,23 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
 \usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{microtype}
+\setlength{\emergencystretch}{2em}
 \usepackage{caption}
 \captionsetup{font=small,labelfont=bf}
 \usepackage{enumitem}
 \setlist{itemsep=2pt,topsep=4pt}
-\usepackage{url}
+\usepackage[obeyspaces,spaces]{url}
+\DeclareUrlCommand\cmd{\urlstyle{tt}}
 \usepackage[hidelinks]{hyperref}
 \urlstyle{same}
 
 \definecolor{kblue}{HTML}{2A78D6}
 
 \input{generated/numbers.tex}
+\makeatletter
+\newcommand{\tabinput}[1]{\@@input #1 }  % primitive \input: safe inside tabular before \bottomrule
+\makeatother
 \newcommand{\R}[3]{\csname R@#1@#2@#3\endcsname}       % offline results: protocol, policy, metric
 \newcommand{\W}[4]{\csname W@#1@#2@#3@#4\endcsname}    % per workload
 \newcommand{\T}[4]{\csname T@#1@#2@#3@#4\endcsname}    % paired tests
