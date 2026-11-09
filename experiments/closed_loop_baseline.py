@@ -96,7 +96,10 @@ def gate_stops(gate: KANGate, status, seen: int, epochs: int) -> tuple[bool, flo
 
 
 def control_one(rec: dict, epochs: int, extra_args: list[str], lr_patience: int,
-                stop_patience: int | None, gate: KANGate | None = None) -> dict:
+                stop_patience: int | None, gate_path: Path | None = None) -> dict:
+    # One gate object per run: pykan models cache activations during a
+    # forward pass, so parallel runs must not share one.
+    gate = KANGate.load(gate_path) if gate_path is not None else None
     client = lpc.LocalProcessTrainJobClient()
     name = f"baseline-{rec['run_id']}"
     client.create(name, epochs=epochs, lr=rec["lr"], batch_size=rec["batch_size"],
@@ -153,7 +156,7 @@ def main():
     args = parser.parse_args()
     if args.policy == "kanstop":
         args.out = args.out or RESULTS / f"closed_loop_{args.workload}_kanstop_plateau_lr{args.lr_patience}.json"
-        gate = KANGate.load(RESULTS / "gates" / f"kan_lowo_{args.workload}")
+        gate = RESULTS / "gates" / f"kan_lowo_{args.workload}"
         stop_patience = None
     else:
         args.out = args.out or RESULTS / (f"closed_loop_{args.workload}_plateau"
