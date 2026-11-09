@@ -32,11 +32,11 @@ At decision epoch $t$ the gate may use only $v_{1:t}$ and $g_{1:t}$. With a wind
 \begin{align}
 x_1 &= \operatorname{clip}\!\Big(1-10\,\frac{\max(v_{t-w+1}-v_t,\,0)}{|v_{t-w+1}|}\Big) && \text{plateau score}\label{eq:f1}\\
 x_2 &= \operatorname{clip}\!\Big(\frac{\tfrac1w\sum_{s=t-w+1}^{t} g_s}{\max_{s\le t} g_s}\Big) && \text{gradient trend}\label{eq:f2}\\
-x_3 &= \frac{\#\{i:\Delta_i\Delta_{i+1}<0\}}{w-2} && \text{oscillation (LR-decay benefit)}\label{eq:f3}\\
+x_3 &= \frac{\#\{i:\Delta_i\Delta_{i+1}<0\}}{w-2} && \text{oscillation}\label{eq:f3}\\
 x_4 &= 1-t/T && \text{budget remaining}\label{eq:f4}\\
 x_5 &= \operatorname{clip}\!\big((t-\arg\min_{s\le t} v_s)/30\big) && \text{epochs since improvement}\label{eq:f5}
 \end{align}
-where $\operatorname{clip}(\cdot)$ clips to $[0,1]$ and the window is truncated to the epochs available when $t<w$. Normalising the gradient norm by the run's own peak (Eq.~\ref{eq:f2}) makes $x_2$ scale-free across architectures, whose raw gradient norms differ by orders of magnitude. $x_3$ counts direction changes of the loss, a sign that a smaller learning rate may help. In the software the budget feature is named \texttt{gpu\_hours\_remaining\_vs\_budget}; in all experiments here it is the fraction of the epoch budget left, not a measured GPU-hour figure. Decisions are taken every two epochs from epoch 4, i.e.\ at $t\in\{4,6,\dots,38\}$, giving 18 decision points per run.
+where $\operatorname{clip}(\cdot)$ clips to $[0,1]$ and the window is truncated to the epochs available when $t<w$. Normalising the gradient norm by the run's own peak (Eq.~\ref{eq:f2}) makes $x_2$ scale-free across architectures, whose raw gradient norms differ by orders of magnitude. $x_3$ counts direction changes of the loss, a sign that a smaller learning rate may help. In the software $x_3$ is named \texttt{lr\_decay\_benefit} and the budget feature \texttt{gpu\_hours\_remaining\_vs\_budget}; in all experiments here the latter is the fraction of the epoch budget left, not a measured GPU-hour figure. The window $w=5$, the factor 10 in $x_1$ and the normaliser of 30 epochs in $x_5$ were fixed before any experiment and not tuned; Method validation reports how the results change when $w$ and the normaliser are varied. Decisions are taken every two epochs from epoch 4, i.e.\ at $t\in\{4,6,\dots,38\}$, giving 18 decision points per run.
 
 \subsection*{Step 3: label every decision point in hindsight}
 Let $m_t=\min_{s\le t}v_s$ be the best validation loss seen by epoch $t$. Because the recorded run continued to $T$, the relative improvement that was still to come is known:

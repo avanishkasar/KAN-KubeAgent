@@ -74,6 +74,10 @@ WL_KEY = {"fmnist_cnn": "fmnist", "mnist_cnn": "mnist", "cifar10_cnn": "cifar",
 WL_SHORT = {"fmnist_cnn": "Fashion-MNIST CNN", "mnist_cnn": "MNIST CNN",
             "cifar10_cnn": "CIFAR-10 CNN", "fmnist_mlp_sgd": "Fashion-MNIST MLP (SGD)"}
 FEATURE_SYMBOL = {n: f"x_{i + 1}" for i, n in enumerate(FEATURE_NAMES)}
+# names used in the article (Eqs. 1-5); the software names differ for x_3 and x_4
+PAPER_NAME = {"loss_plateau_score": "plateau score", "gradient_trend": "gradient trend",
+              "lr_decay_benefit": "oscillation", "gpu_hours_remaining_vs_budget": "budget remaining",
+              "epochs_since_improvement": "epochs since improvement"}
 
 macros: list[str] = []
 
@@ -247,7 +251,7 @@ def table_ablation(g: dict) -> None:
     for a in g["ablation"]:
         f = a["removed_feature"]
         label = "None (all five features)" if f is None else \
-            f"${FEATURE_SYMBOL[f]}$ ({f.replace('_', ' ')})".replace("gpu hours remaining vs budget", "budget remaining")
+            f"${FEATURE_SYMBOL[f]}$ ({PAPER_NAME[f]})"
         rows.append(f"{label} & {f1(a['compute_saved_pct'])} & {f2(a['mean_regret_pct'])} & "
                     f"{f1(a['premature_rate_pct'])} \\\\")
     rows.append("\\midrule")
@@ -453,6 +457,42 @@ def plateau_compare() -> dict:
                for a, b in zip(pooled["ks"], pooled["plat"]))
     return {"same": same, "n": len(pooled["ks"])}
 
+
+# ----------------------------------------------------------------------------- additional checks
+
+def review_checks() -> None:
+    """Decision cadence, a learning-curve extrapolation baseline, the
+    decision-level cost of symbolic fixing and feature-constant sensitivity
+    (experiments/review_checks.py)."""
+    path = RES / "review_checks.json"
+    if not path.exists():
+        raise SystemExit(f"missing {path}: run python -m experiments.review_checks first")
+    d = json.loads(path.read_text())
+    pol, tests = d["policies"], d["tests_vs_kan"]
+    labels = [("kan", "KAN gate, decisions every 2 epochs (main study)"),
+              ("kan_every_epoch", "KAN gate, decisions every epoch"),
+              ("kan_spline", "Spline KAN before symbolic fixing"),
+              ("patience8", "Patience 8, checked every epoch"),
+              ("patience8_every2", "Patience 8, checked every 2 epochs"),
+              ("extrapolation", "Power-law extrapolation, stop at $<\\tau/4$ predicted gain")]
+    rows = []
+    for key, label in labels:
+        v = pol[key]
+        m(f"RC@{key}@saved", f1(v["saved"])); m(f"RC@{key}@regret", f2(v["regret"]))
+        m(f"RC@{key}@prem", f1(v["premature"]))
+        rows.append(f"{label} & {f1(v['saved'])} & {f2(v['regret'])} & {f1(v['premature'])} \\\\")
+    rows.append("\\midrule")
+    for key, (w, n) in [("w3_n30", (3, 30)), ("w5_n30", (5, 30)), ("w8_n30", (8, 30)),
+                        ("w5_n20", (5, 20)), ("w5_n40", (5, 40))]:
+        v = d["sensitivity"][key]
+        m(f"RC@{key}@saved", f1(v["saved"])); m(f"RC@{key}@regret", f2(v["regret"]))
+        rows.append(f"KAN gate, window $w={w}$, $x_5$ normaliser {n} & {f1(v['saved'])} & "
+                    f"{f2(v['regret'])} & {f1(v['premature'])} \\\\")
+    (GEN / "table_review_checks.tex").write_text("\n".join(rows) + "\n")
+    m("RC@agree", f1(100 * d["band_agreement_spline_vs_symbolic"]))
+    for k, v in tests.items():
+        m("RC@p@" + k.replace("_", "").replace("@", "@"), pm(v))
+
 # ----------------------------------------------------------------------------- deployed gate
 
 def deployed_gate() -> KANGate:
@@ -651,6 +691,7 @@ def main():
     cl = closed_loop()
     patience_transfer(g)
     pl = plateau_compare()
+    review_checks()
     gate = deployed_gate()
     fig_curves(g)
     fig_frontier(g)
