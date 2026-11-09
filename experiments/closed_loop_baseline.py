@@ -21,7 +21,16 @@ Control runs through the same asynchronous client as the KAN controller:
 a learning-rate change takes effect at the next epoch boundary the
 process reads, and a stop terminates the process.
 
+A second policy, --policy kanstop, keeps the same reduce-on-plateau
+learning-rate schedule but replaces patience-based stopping with the KAN
+gate trained on the other three workloads (experiments/results/gates/
+kan_lowo_<workload>): at every decision epoch (4, 6, ..., 38) the gate sees
+the run's history up to that epoch and the run is stopped if the gate's
+decision is early_stop. Its adjust band is ignored, because the learning
+rate is left to the plateau schedule.
+
     python -m experiments.closed_loop_baseline --workload cifar10_cnn
+    python -m experiments.closed_loop_baseline --workload cifar10_cnn --policy kanstop
 """
 from __future__ import annotations
 
@@ -33,6 +42,9 @@ from pathlib import Path
 
 import agents.local_process_client as lpc
 from experiments.collect_curves import WORKLOADS, curves_path
+from kan_gate.features import TrainingHistory, extract_features
+from kan_gate.gate import KANGate
+from kan_gate.hindsight import DEFAULT_CHECK_EVERY, DEFAULT_FIRST_CHECK
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS = REPO_ROOT / "experiments" / "results"
@@ -45,9 +57,10 @@ FACTOR = 0.5
 
 
 class PlateauPolicy:
-    """ReduceLROnPlateau + EarlyStopping on validation loss, one epoch at a time."""
+    """ReduceLROnPlateau + EarlyStopping on validation loss, one epoch at a time.
+    stop_patience=None disables patience-based stopping."""
 
-    def __init__(self, lr: float, lr_patience: int, stop_patience: int):
+    def __init__(self, lr: float, lr_patience: int, stop_patience: int | None):
         self.lr = lr
         self.lr_patience = lr_patience
         self.stop_patience = stop_patience
@@ -63,7 +76,7 @@ class PlateauPolicy:
         else:
             self.bad_lr += 1
             self.bad_stop += 1
-        if self.bad_stop >= self.stop_patience:
+        if self.stop_patience is not None and self.bad_stop >= self.stop_patience:
             return "early_stop"
         if self.bad_lr >= self.lr_patience:
             self.bad_lr = 0
@@ -72,8 +85,18 @@ class PlateauPolicy:
         return "continue"
 
 
+def gate_stops(gate: KANGate, status, seen: int, epochs: int) -> tuple[bool, float]:
+    """KAN gate decision on the history up to epoch `seen` only."""
+    history = TrainingHistory(loss_history=status.val_loss_history[:seen],
+                              grad_norm_history=status.grad_norm_history[:seen],
+                              lr=status.lr, gpu_hours_used=status.gpu_hours_budget * seen / epochs,
+                              gpu_hours_budget=status.gpu_hours_budget)
+    result = gate.decide(extract_features(history))
+    return result.decision == "early_stop", result.score
+
+
 def control_one(rec: dict, epochs: int, extra_args: list[str], lr_patience: int,
-                stop_patience: int) -> dict:
+                stop_patience: int | None, gate: KANGate | None = None) -> dict:
     client = lpc.LocalProcessTrainJobClient()
     name = f"baseline-{rec['run_id']}"
     client.create(name, epochs=epochs, lr=rec["lr"], batch_size=rec["batch_size"],
@@ -88,6 +111,12 @@ def control_one(rec: dict, epochs: int, extra_args: list[str], lr_patience: int,
         while seen < len(status.val_loss_history) and status.phase == "Running":
             decision = policy.step(status.val_loss_history[seen])
             seen += 1
+            if (gate is not None and seen >= DEFAULT_FIRST_CHECK
+                    and (seen - DEFAULT_FIRST_CHECK) % DEFAULT_CHECK_EVERY == 0):
+                stop, score = gate_stops(gate, status, seen, epochs)
+                if stop:
+                    decision = "early_stop"
+                decisions.append({"after_epoch": seen, "decision": "gate", "gate_score": score})
             if decision == "adjust_lr":
                 client.patch_lr(name, policy.lr)
                 decisions.append({"after_epoch": seen, "decision": decision, "new_lr": policy.lr})
@@ -116,22 +145,29 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workload", choices=sorted(WORKLOADS), default="fmnist_cnn")
     parser.add_argument("--test-seed", type=int, default=2)
+    parser.add_argument("--policy", choices=["plateau", "kanstop"], default="plateau")
     parser.add_argument("--lr-patience", type=int, default=3)
     parser.add_argument("--stop-patience", type=int, default=8)
     parser.add_argument("--parallel", type=int, default=2)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
-    args.out = args.out or RESULTS / (f"closed_loop_{args.workload}_plateau"
-                                      f"_lr{args.lr_patience}_stop{args.stop_patience}.json")
+    if args.policy == "kanstop":
+        args.out = args.out or RESULTS / f"closed_loop_{args.workload}_kanstop_plateau_lr{args.lr_patience}.json"
+        gate = KANGate.load(RESULTS / "gates" / f"kan_lowo_{args.workload}")
+        stop_patience = None
+    else:
+        args.out = args.out or RESULTS / (f"closed_loop_{args.workload}_plateau"
+                                          f"_lr{args.lr_patience}_stop{args.stop_patience}.json")
+        gate, stop_patience = None, args.stop_patience
     extra_args = WORKLOADS[args.workload][0]
     recs = [json.loads(l) for l in curves_path(args.workload).read_text().splitlines() if l.strip()]
     recs = sorted((r for r in recs if r["seed"] == args.test_seed), key=lambda r: (r["lr"], r["batch_size"]))
     epochs = len(recs[0]["val_loss"])
-    print(f"{len(recs)} configs, seed {args.test_seed}, plateau policy "
-          f"(lr patience {args.lr_patience}, stop patience {args.stop_patience})", flush=True)
+    print(f"{len(recs)} configs, seed {args.test_seed}, policy {args.policy} "
+          f"(lr patience {args.lr_patience}, stop patience {stop_patience})", flush=True)
 
     def job(rec):
-        res = control_one(rec, epochs, extra_args, args.lr_patience, args.stop_patience)
+        res = control_one(rec, epochs, extra_args, args.lr_patience, stop_patience, gate)
         print(f"{rec['run_id']}: ran {res['epochs_run']}/{epochs} epochs, best val "
               f"{min(res['val_loss']):.4f} (uncontrolled {min(rec['val_loss']):.4f}), "
               f"{sum(d['decision'] == 'adjust_lr' for d in res['decisions'])} LR halvings", flush=True)
@@ -161,8 +197,9 @@ def main():
         })
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({"workload": args.workload, "test_seed": args.test_seed,
-                                    "policy": "reduce_on_plateau+early_stopping",
-                                    "lr_patience": args.lr_patience, "stop_patience": args.stop_patience,
+                                    "policy": ("reduce_on_plateau+kan_gate_stop" if args.policy == "kanstop"
+                                               else "reduce_on_plateau+early_stopping"),
+                                    "lr_patience": args.lr_patience, "stop_patience": stop_patience,
                                     "factor": FACTOR, "threshold": THRESHOLD,
                                     "runs": results, "summary": summary}, indent=1))
     total = sum(s["epochs_run"] for s in summary)
