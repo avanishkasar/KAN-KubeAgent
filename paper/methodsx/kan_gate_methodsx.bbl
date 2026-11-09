@@ -135,6 +135,17 @@ K.~Swersky, J.~Snoek, R.~P. Adams, Freeze-thaw {B}ayesian optimization, arXiv
 \newblock \href {https://doi.org/10.48550/arXiv.1406.3896}
   {\path{doi:10.48550/arXiv.1406.3896}}.
 
+\bibitem{mahsereci2017noval}
+M.~Mahsereci, L.~Balles, C.~Lassner, P.~Hennig, Early stopping without a
+  validation set, arXiv preprint arXiv:1703.09580 (2017).
+\newblock \href {https://doi.org/10.48550/arXiv.1703.09580}
+  {\path{doi:10.48550/arXiv.1703.09580}}.
+
+\bibitem{martin2021rmt}
+C.~H. Martin, M.~W. Mahoney, Implicit self-regularization in deep neural
+  networks: Evidence from random matrix theory and implications for learning,
+  Journal of Machine Learning Research 22~(165) (2021) 1--73.
+
 \bibitem{rudin2019stop}
 C.~Rudin, Stop explaining black box machine learning models for high stakes
   decisions and use interpretable models instead, Nature Machine Intelligence
@@ -171,6 +182,13 @@ K.~Singh, S.~Marouani, A.~A. Sheikh, P.~T.~A. Quang, A.~Habrard, Interpretable
   networks, arXiv preprint arXiv:2505.14459 (2025).
 \newblock \href {https://doi.org/10.48550/arXiv.2505.14459}
   {\path{doi:10.48550/arXiv.2505.14459}}.
+
+\bibitem{faroughi2026symbolickan}
+S.~A. Faroughi, F.~Mostajeran, A.~Arzani, S.~Faroughi, Symbolic--{KAN}:
+  {K}olmogorov--{A}rnold networks with discrete symbolic structure for
+  interpretable learning, arXiv preprint arXiv:2603.23854 (2026).
+\newblock \href {https://doi.org/10.48550/arXiv.2603.23854}
+  {\path{doi:10.48550/arXiv.2603.23854}}.
 
 \bibitem{yu2024kanormlp}
 R.~Yu, W.~Yu, X.~Wang, {KAN} or {MLP}: A fairer comparison, arXiv preprint

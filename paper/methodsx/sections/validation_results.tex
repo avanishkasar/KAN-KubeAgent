@@ -100,3 +100,28 @@ Feature removed / setting & Saved (\%) & Regret (\%) & Premature (\%) \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection*{Further checks}
+Table~\ref{tab:checks} reports four further checks under the leave-one-workload-out protocol, with the same three gate seeds; the first row reproduces the main result exactly.
+
+\paragraph{Decision cadence} In the main study the gate decides every two epochs and patience is checked after every epoch. Letting the gate decide after every epoch changed its result little (\X{RC@kan_every_epoch@saved}\% saved at \X{RC@kan_every_epoch@regret}\% regret; regret against the main gate $p\X{RC@p@kaneveryepoch@regret}$), and checking patience 8 only at the gate's decision epochs gave \X{RC@patience8_every2@saved}\% at \X{RC@patience8_every2@regret}\%. The difference in cadence therefore does not explain the comparison with patience.
+
+\paragraph{Learning-curve extrapolation} A single-run extrapolation baseline fits a power law $v(t)=a+b\,t^{-c}$ to the validation losses seen so far at each decision epoch and stops when the fitted curve predicts less than $\tau/4=1.25\%$ further improvement of the best loss within the budget, the quantity the gate's stop band targets. It saved \X{RC@extrapolation@saved}\% of epochs but at \X{RC@extrapolation@regret}\% mean regret, with \X{RC@extrapolation@prem}\% of runs stopped prematurely: on these curves, which often plateau and then improve again, a parametric extrapolation from a partial curve is too optimistic about convergence. Ensembles of curve models~\cite{domhan2015extrapolation} or learned curve priors~\cite{adriaensen2023lcpfn} would be stronger, but they are fitted to rank configurations and their predictions are not readable rules.
+
+\paragraph{Decision-level cost of symbolic fixing} On the held-out decision points, the spline network before symbolic fixing and the symbolic gate fell in the same decision band at \X{RC@agree}\% of points. Fixing the edges made the gate more conservative: the spline network saved \X{RC@kan_spline@saved}\% of epochs but at \X{RC@kan_spline@regret}\% regret with \X{RC@kan_spline@prem}\% premature stops ($p\X{RC@p@kanspline@regret}$ for regret against the symbolic gate). On these workloads the readable formula therefore costs no stopping quality, although it changes about a quarter of the individual decisions.
+
+\paragraph{Feature constants} With window $w=3$, $5$ and $8$ the gate saved \X{RC@w3_n30@saved}\%, \X{RC@w5_n30@saved}\% and \X{RC@w8_n30@saved}\% at \X{RC@w3_n30@regret}\%, \X{RC@w5_n30@regret}\% and \X{RC@w8_n30@regret}\% regret, and with the $x_5$ normaliser at 20, 30 and 40 epochs it saved \X{RC@w5_n20@saved}\%, \X{RC@w5_n30@saved}\% and \X{RC@w5_n40@saved}\% at \X{RC@w5_n20@regret}\%, \X{RC@w5_n30@regret}\% and \X{RC@w5_n40@regret}\% regret. The constants move the gate along the same trade-off, as the tolerance $\tau$ does, without a loss of quality, so the default values are not a tuned optimum on which the results depend.
+
+\begin{table}[t]
+\centering
+\caption{Further checks, leave-one-workload-out, 144 runs (learned gates: mean over three gate seeds). Saved: compute saved (\%); Regret: mean regret in best validation loss (\%); Prem.: runs stopped with more than 2\% regret (\%).}
+\label{tab:checks}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Policy / setting & Saved (\%) & Regret (\%) & Prem.\ (\%) \\
+\midrule
+\tabinput{generated/table_review_checks.tex}
+\bottomrule
+\end{tabular}
+\end{table}
