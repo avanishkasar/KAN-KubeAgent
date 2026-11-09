@@ -10,20 +10,6 @@ Table~\ref{tab:main} lists every policy under both protocols, and Fig.~\ref{fig:
 
 \paragraph{A tuned patience rule under the same transfer protocol} Patience 8 was picked with knowledge of all four workloads. To compare like with like, we tuned the patience the way the gate is trained: for each held-out workload, the patience (1 to 20 epochs) that saves the most compute on the other three workloads while keeping their mean regret within a target was applied to the held-out one (Table~\ref{tab:pattransfer}). For targets of \X{PT@1@target}\% and \X{PT@2@target}\% the tuned rule saved \X{PT@1@saved}\% and \X{PT@2@saved}\% at \X{PT@1@regret}\% and \X{PT@2@regret}\% mean regret, so on the stop decision alone it is as good as or slightly better than the KAN gate. Its quality, however, transferred less evenly: the patience chosen on the three Adam-trained workloads was too short for the SGD-trained one, whose mean regret reached \X{PT@1@worst}\%, whereas the KAN gate's mean regret stayed at or below \X{PT@kanworst}\% on every held-out workload.
 
-\begin{table}[t]
-\centering
-\caption{Patience rule tuned under the leave-one-workload-out protocol. For each held-out workload, the patience is the shortest one (largest saving) whose mean regret on the other three workloads is within the target. Patience is listed per held-out workload in the order Fashion-MNIST CNN, MNIST CNN, CIFAR-10 CNN, Fashion-MNIST MLP (SGD). Worst: largest mean regret of any held-out workload.}
-\label{tab:pattransfer}
-\small
-\begin{tabular}{rlrrrr}
-\toprule
-Target (\%) & Patience chosen & Saved (\%) & Regret (\%) & Prem.\ (\%) & Worst (\%) \\
-\midrule
-\tabinput{generated/table_patience_transfer.tex}
-\bottomrule
-\end{tabular}
-\end{table}
-
 \paragraph{Every workload behaves consistently} Table~\ref{tab:perworkload} breaks the transfer result down by held-out workload. The KAN gate kept mean regret at or below 0.6\% on every held-out workload, including CIFAR-10, the only colour-image workload, and the SGD-trained MLP, the only workload with a different optimiser. Its largest single-run regret, \R{lowo}{kan}{max}\%, occurs on one unstable SGD run (learning rate 0.3) whose validation loss hovers without progress for about 15 epochs and then reaches its best value in a single isolated dip at epoch 21; every hindsight-trained gate and both patience 5 and patience 8 stop that run before the dip, and only the oracle does not.
 
 \begin{table}[p]
@@ -53,21 +39,6 @@ Policy & Saved (\%) & Regret (\%) & Prem.\ (\%) & Saved (\%) & Regret (\%) & Pre
 
 \begin{table}[t]
 \centering
-\caption{Leave-one-workload-out results per held-out workload: compute saved (\%) / mean regret (\%).}
-\label{tab:perworkload}
-\footnotesize
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lcccc}
-\toprule
-Policy & Fashion-MNIST CNN & MNIST CNN & CIFAR-10 CNN & F-MNIST MLP (SGD) \\
-\midrule
-\tabinput{generated/table_per_workload.tex}
-\bottomrule
-\end{tabular}}
-\end{table}
-
-\begin{table}[t]
-\centering
 \caption{Paired comparison of the KAN gate with each alternative over \nRuns{} runs: median difference (KAN minus alternative) in stop epoch and in regret (percentage points), with Holm-corrected Wilcoxon signed-rank $p$-values. A negative stop difference means the KAN gate stops earlier.}
 \label{tab:tests}
 \footnotesize
@@ -80,6 +51,35 @@ Policy & Fashion-MNIST CNN & MNIST CNN & CIFAR-10 CNN & F-MNIST MLP (SGD) \\
 Alternative & $\Delta$stop & $p$ & $\Delta$regret & $p$ & $\Delta$stop & $p$ & $\Delta$regret & $p$ \\
 \midrule
 \tabinput{generated/table_tests.tex}
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Patience rule tuned under the leave-one-workload-out protocol. For each held-out workload, the patience is the shortest one (largest saving) whose mean regret on the other three workloads is within the target. Patience is listed per held-out workload in the order Fashion-MNIST CNN, MNIST CNN, CIFAR-10 CNN, Fashion-MNIST MLP (SGD). Worst: largest mean regret of any held-out workload.}
+\label{tab:pattransfer}
+\small
+\begin{tabular}{rlrrrr}
+\toprule
+Target (\%) & Patience chosen & Saved (\%) & Regret (\%) & Prem.\ (\%) & Worst (\%) \\
+\midrule
+\tabinput{generated/table_patience_transfer.tex}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Leave-one-workload-out results per held-out workload: compute saved (\%) / mean regret (\%).}
+\label{tab:perworkload}
+\footnotesize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Policy & Fashion-MNIST CNN & MNIST CNN & CIFAR-10 CNN & F-MNIST MLP (SGD) \\
+\midrule
+\tabinput{generated/table_per_workload.tex}
 \bottomrule
 \end{tabular}}
 \end{table}

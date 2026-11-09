@@ -630,9 +630,9 @@ def graphical_abstract(g: dict, cl: dict) -> None:
         ax.annotate("", xy=(x1, 24), xytext=(x0, 24), arrowprops=dict(arrowstyle="-|>", color=INK2, lw=1.2))
     lo = g["summary"]["lowo"][OURS]
     ax.text(50, 6.5,
-            f"Unseen workloads: {lo['compute_saved_pct']:.1f}% of epochs saved at {lo['mean_regret_pct']:.2f}% mean regret"
-            f"   |   live: same best loss as standard practice on {cl['same']}/{cl['n']} runs",
-            ha="center", va="center", fontsize=7.6, color=INK)
+            f"Unseen workloads: {lo['compute_saved_pct']:.1f}% of epochs saved at {lo['mean_regret_pct']:.2f}% mean regret\n"
+            f"Live training: same best loss as standard practice on {cl['same']} of {cl['n']} runs",
+            ha="center", va="center", fontsize=7.6, color=INK, linespacing=1.5)
     fig.savefig(PAPER / "graphical_abstract.pdf")
     fig.savefig(PAPER / "graphical_abstract.png", dpi=300)
     plt.close(fig)

@@ -8,17 +8,22 @@
 \bibitem{schwartz2020greenai}
 R.~Schwartz, J.~Dodge, N.~A. Smith, O.~Etzioni, Green {AI}, Communications of
   the ACM 63~(12) (2020).
+\newblock \href {https://doi.org/10.1145/3381831} {\path{doi:10.1145/3381831}}.
 
 \bibitem{prechelt2012early}
 L.~Prechelt, Early stopping --- but when?, in: G.~Montavon, G.~B. Orr, K.-R.
   M{\"u}ller (Eds.), Neural Networks: Tricks of the Trade, 2nd Edition,
-  Springer, 2012.
+  Springer, 2012, pp. 53--67.
+\newblock \href {https://doi.org/10.1007/978-3-642-35289-8_5}
+  {\path{doi:10.1007/978-3-642-35289-8_5}}.
 
 \bibitem{golovin2017vizier}
 D.~Golovin, B.~Solnik, S.~Moitra, G.~Kochanski, J.~Karro, D.~Sculley, Google
   {V}izier: A service for black-box optimization, in: Proceedings of the 23rd
   ACM SIGKDD International Conference on Knowledge Discovery and Data Mining
-  (KDD), 2017.
+  (KDD), 2017, pp. 1487--1495.
+\newblock \href {https://doi.org/10.1145/3097983.3098043}
+  {\path{doi:10.1145/3097983.3098043}}.
 
 \bibitem{li2018hyperband}
 L.~Li, K.~Jamieson, G.~DeSalvo, A.~Rostamizadeh, A.~Talwalkar, Hyperband: A
@@ -29,7 +34,7 @@ L.~Li, K.~Jamieson, G.~DeSalvo, A.~Rostamizadeh, A.~Talwalkar, Hyperband: A
 L.~Li, K.~Jamieson, A.~Rostamizadeh, E.~Gonina, J.~Ben-tzur, M.~Hardt,
   B.~Recht, A.~Talwalkar, A system for massively parallel hyperparameter
   tuning, in: Proceedings of Machine Learning and Systems (MLSys), Vol.~2,
-  2020.
+  2020, pp. 230--246.
 
 \bibitem{falkner2018bohb}
 S.~Falkner, A.~Klein, F.~Hutter, {BOHB}: Robust and efficient hyperparameter
@@ -39,23 +44,30 @@ S.~Falkner, A.~Klein, F.~Hutter, {BOHB}: Robust and efficient hyperparameter
 \bibitem{akiba2019optuna}
 T.~Akiba, S.~Sano, T.~Yanase, T.~Ohta, M.~Koyama, Optuna: A next-generation
   hyperparameter optimization framework, in: Proceedings of the 25th ACM SIGKDD
-  International Conference on Knowledge Discovery and Data Mining (KDD), 2019.
+  International Conference on Knowledge Discovery and Data Mining (KDD), 2019,
+  pp. 2623--2631.
+\newblock \href {https://doi.org/10.1145/3292500.3330701}
+  {\path{doi:10.1145/3292500.3330701}}.
 
 \bibitem{liaw2018tune}
 R.~Liaw, E.~Liang, R.~Nishihara, P.~Moritz, J.~E. Gonzalez, I.~Stoica, Tune: A
   research platform for distributed model selection and training, {ICML} AutoML
-  Workshop; arXiv:1807.05118 (2018).
+  Workshop; arXiv preprint arXiv:1807.05118 (2018).
+\newblock \href {https://doi.org/10.48550/arXiv.1807.05118}
+  {\path{doi:10.48550/arXiv.1807.05118}}.
 
 \bibitem{george2020katib}
 J.~George, C.~Gao, R.~Liu, H.~G. Liu, Y.~Tang, R.~Pydipaty, A.~K. Saha, A
-  scalable and cloud-native hyperparameter tuning system, arXiv:2006.02085
-  (2020).
+  scalable and cloud-native hyperparameter tuning system, arXiv preprint
+  arXiv:2006.02085 (2020).
+\newblock \href {https://doi.org/10.48550/arXiv.2006.02085}
+  {\path{doi:10.48550/arXiv.2006.02085}}.
 
 \bibitem{domhan2015extrapolation}
 T.~Domhan, J.~T. Springenberg, F.~Hutter, Speeding up automatic hyperparameter
   optimization of deep neural networks by extrapolation of learning curves, in:
   Proceedings of the 24th International Joint Conference on Artificial
-  Intelligence (IJCAI), 2015.
+  Intelligence (IJCAI), 2015, pp. 3460--3468.
 
 \bibitem{klein2017lcnet}
 A.~Klein, S.~Falkner, J.~T. Springenberg, F.~Hutter, Learning curve prediction
@@ -70,16 +82,20 @@ S.~Adriaensen, H.~Rakotoarison, S.~M{\"u}ller, F.~Hutter, Efficient {B}ayesian
 \bibitem{zhang2023llmhpo}
 M.~R. Zhang, N.~Desai, J.~Bae, J.~Lorraine, J.~Ba, Using large language models
   for hyperparameter optimization, {NeurIPS} Workshop on Foundation Models for
-  Decision Making; arXiv:2312.04528 (2023).
+  Decision Making; arXiv preprint arXiv:2312.04528 (2023).
+\newblock \href {https://doi.org/10.48550/arXiv.2312.04528}
+  {\path{doi:10.48550/arXiv.2312.04528}}.
 
 \bibitem{liu2024agenthpo}
 S.~Liu, C.~Gao, Y.~Li, Large language model agent for hyper-parameter
-  optimization, arXiv:2402.01881 (2024).
+  optimization, arXiv preprint arXiv:2402.01881 (2024).
+\newblock \href {https://doi.org/10.48550/arXiv.2402.01881}
+  {\path{doi:10.48550/arXiv.2402.01881}}.
 
 \bibitem{huang2024mlagentbench}
 Q.~Huang, J.~Vora, P.~Liang, J.~Leskovec, {MLAgentBench}: Evaluating language
   agents on machine learning experimentation, in: Proceedings of the 41st
-  International Conference on Machine Learning (ICML), 2024.
+  International Conference on Machine Learning (ICML), 2024, pp. 20271--20309.
 
 \bibitem{chan2025mlebench}
 J.~S. Chan, N.~Chowdhury, O.~Jaffe, J.~Aung, D.~Sherburn, E.~Mays, G.~Starace,
@@ -92,10 +108,39 @@ S.~Yao, J.~Zhao, D.~Yu, N.~Du, I.~Shafran, K.~Narasimhan, Y.~Cao, {ReAct}:
   Synergizing reasoning and acting in language models, in: International
   Conference on Learning Representations (ICLR), 2023.
 
+\bibitem{daniel2016stepsize}
+C.~Daniel, J.~Taylor, S.~Nowozin, Learning step size controllers for robust
+  neural network training, in: Proceedings of the AAAI Conference on Artificial
+  Intelligence, Vol.~30, 2016, pp. 1519--1525.
+\newblock \href {https://doi.org/10.1609/aaai.v30i1.10187}
+  {\path{doi:10.1609/aaai.v30i1.10187}}.
+
+\bibitem{xu2019adaptivelr}
+Z.~Xu, A.~M. Dai, J.~Kemp, L.~Metz, Learning an adaptive learning rate
+  schedule, neurIPS Workshop on Meta-Learning; arXiv preprint arXiv:1909.09712
+  (2019).
+\newblock \href {https://doi.org/10.48550/arXiv.1909.09712}
+  {\path{doi:10.48550/arXiv.1909.09712}}.
+
+\bibitem{baker2017performance}
+B.~Baker, O.~Gupta, R.~Raskar, N.~Naik, Accelerating neural architecture search
+  using performance prediction, iCLR 2018 Workshop; arXiv preprint
+  arXiv:1705.10823 (2017).
+\newblock \href {https://doi.org/10.48550/arXiv.1705.10823}
+  {\path{doi:10.48550/arXiv.1705.10823}}.
+
+\bibitem{swersky2014freezethaw}
+K.~Swersky, J.~Snoek, R.~P. Adams, Freeze-thaw {B}ayesian optimization, arXiv
+  preprint arXiv:1406.3896 (2014).
+\newblock \href {https://doi.org/10.48550/arXiv.1406.3896}
+  {\path{doi:10.48550/arXiv.1406.3896}}.
+
 \bibitem{rudin2019stop}
 C.~Rudin, Stop explaining black box machine learning models for high stakes
   decisions and use interpretable models instead, Nature Machine Intelligence
   1~(5) (2019) 206--215.
+\newblock \href {https://doi.org/10.1038/s42256-019-0048-x}
+  {\path{doi:10.1038/s42256-019-0048-x}}.
 
 \bibitem{liu2025kan}
 Z.~Liu, Y.~Wang, S.~Vaidya, F.~Ruehle, J.~Halverson, M.~Solja{\v{c}}i{\'c},
@@ -105,7 +150,10 @@ Z.~Liu, Y.~Wang, S.~Vaidya, F.~Ruehle, J.~Halverson, M.~Solja{\v{c}}i{\'c},
 
 \bibitem{liu2024kan2}
 Z.~Liu, P.~Ma, Y.~Wang, W.~Matusik, M.~Tegmark, {KAN} 2.0:
-  {K}olmogorov-{A}rnold networks meet science, arXiv:2408.10205 (2024).
+  {K}olmogorov-{A}rnold networks meet science, arXiv preprint arXiv:2408.10205
+  (2024).
+\newblock \href {https://doi.org/10.48550/arXiv.2408.10205}
+  {\path{doi:10.48550/arXiv.2408.10205}}.
 
 \bibitem{segel2023symbolic}
 S.~Segel, H.~Graf, A.~Tornede, B.~Bischl, M.~Lindauer, Symbolic explanations
@@ -120,24 +168,33 @@ W.~Zheng, T.~Chen, T.-K. Hu, Z.~Wang, Symbolic learning to optimize: Towards
 \bibitem{singh2025kanrl}
 K.~Singh, S.~Marouani, A.~A. Sheikh, P.~T.~A. Quang, A.~Habrard, Interpretable
   reinforcement learning for load balancing using {K}olmogorov-{A}rnold
-  networks, arXiv:2505.14459 (2025).
+  networks, arXiv preprint arXiv:2505.14459 (2025).
+\newblock \href {https://doi.org/10.48550/arXiv.2505.14459}
+  {\path{doi:10.48550/arXiv.2505.14459}}.
 
 \bibitem{yu2024kanormlp}
-R.~Yu, W.~Yu, X.~Wang, {KAN} or {MLP}: A fairer comparison, arXiv:2407.16674
-  (2024).
+R.~Yu, W.~Yu, X.~Wang, {KAN} or {MLP}: A fairer comparison, arXiv preprint
+  arXiv:2407.16674 (2024).
+\newblock \href {https://doi.org/10.48550/arXiv.2407.16674}
+  {\path{doi:10.48550/arXiv.2407.16674}}.
 
 \bibitem{alshiekh2018shielding}
 M.~Alshiekh, R.~Bloem, R.~Ehlers, B.~K{\"o}nighofer, S.~Niekum, U.~Topcu, Safe
   reinforcement learning via shielding, in: Proceedings of the AAAI Conference
-  on Artificial Intelligence, Vol.~32, 2018.
+  on Artificial Intelligence, Vol.~32, 2018, pp. 2669--2676.
+\newblock \href {https://doi.org/10.1609/aaai.v32i1.11797}
+  {\path{doi:10.1609/aaai.v32i1.11797}}.
 
 \bibitem{efron1993bootstrap}
 B.~Efron, R.~J. Tibshirani, An Introduction to the Bootstrap, Chapman \& Hall,
   New York, 1993.
+\newblock \href {https://doi.org/10.1201/9780429246593}
+  {\path{doi:10.1201/9780429246593}}.
 
 \bibitem{wilcoxon1945}
 F.~Wilcoxon, Individual comparisons by ranking methods, Biometrics Bulletin
   1~(6) (1945) 80--83.
+\newblock \href {https://doi.org/10.2307/3001968} {\path{doi:10.2307/3001968}}.
 
 \bibitem{holm1979}
 S.~Holm, A simple sequentially rejective multiple test procedure, Scandinavian
@@ -163,15 +220,20 @@ A.~Paszke, S.~Gross, F.~Massa, A.~Lerer, J.~Bradbury, G.~Chanan, T.~Killeen,
   Z.~DeVito, M.~Raison, A.~Tejani, S.~Chilamkurthy, B.~Steiner, L.~Fang,
   J.~Bai, S.~Chintala, {PyTorch}: An imperative style, high-performance deep
   learning library, in: Advances in Neural Information Processing Systems
-  (NeurIPS), Vol.~32, 2019.
+  (NeurIPS), Vol.~32, 2019, pp. 8024--8035.
 
 \bibitem{xiao2017fashion}
 H.~Xiao, K.~Rasul, R.~Vollgraf, {Fashion-MNIST}: A novel image dataset for
-  benchmarking machine learning algorithms, arXiv:1708.07747 (2017).
+  benchmarking machine learning algorithms, arXiv preprint arXiv:1708.07747
+  (2017).
+\newblock \href {https://doi.org/10.48550/arXiv.1708.07747}
+  {\path{doi:10.48550/arXiv.1708.07747}}.
 
 \bibitem{lecun1998mnist}
 Y.~LeCun, L.~Bottou, Y.~Bengio, P.~Haffner, Gradient-based learning applied to
   document recognition, Proceedings of the IEEE 86~(11) (1998) 2278--2324.
+\newblock \href {https://doi.org/10.1109/5.726791}
+  {\path{doi:10.1109/5.726791}}.
 
 \bibitem{krizhevsky2009cifar}
 A.~Krizhevsky, Learning multiple layers of features from tiny images, Technical
