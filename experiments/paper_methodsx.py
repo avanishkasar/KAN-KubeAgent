@@ -386,62 +386,67 @@ def patience_transfer(g: dict) -> None:
 # ----------------------------------------------------------------------------- standard practice in closed loop
 
 PLATEAU_FILE = "closed_loop_{w}_plateau_lr3_stop8.json"
+KANSTOP_FILE = "closed_loop_{w}_kanstop_plateau_lr3.json"
 LOWO_FILE = {"fmnist_cnn": "closed_loop_fmnist_cnn_lowo_guard.json",
              "mnist_cnn": "closed_loop_mnist_cnn_lowo_guard.json",
              "cifar10_cnn": "closed_loop_cifar10_cnn_lowo_guard.json",
              "fmnist_mlp_sgd": "closed_loop_fmnist_mlp_sgd_lowo_guard.json"}
 
 
+def _paired_p(a, b):
+    return 1.0 if all(abs(x - y) < 1e-12 for x, y in zip(a, b)) else float(
+        wilcoxon(a, b, zero_method="zsplit").pvalue)
+
+
 def plateau_compare() -> dict:
-    """ReduceLROnPlateau + early stopping on the same 48 live configurations,
-    paired run by run with the KAN controller (unseen-workload gates)."""
-    rows, pooled_p, pooled_k = [], [], []
-    for w in WORKLOADS:
-        dp = json.loads((RES / PLATEAU_FILE.format(w=w)).read_text())
-        dk = json.loads((RES / LOWO_FILE[w]).read_text())
-        sp = {s["run_id"]: s for s in dp["summary"]}
-        sk = {s["run_id"]: s for s in dk["summary"]}
-        assert sp.keys() == sk.keys(), w
-        ids = sorted(sp)
-        pooled_p += [sp[i] for i in ids]
-        pooled_k += [sk[i] for i in ids]
-        cs = closed_summary([sp[i] for i in ids], dp["runs"])
-        key = "PL@" + WL_KEY[w] + "@"
-        m(key + "saved", f1(cs["saved"])); m(key + "relmed", f2(cs["rel_median"]))
-        rows.append((WL_SHORT[w], cs, [sp[i] for i in ids], [sk[i] for i in ids]))
-    cs_all = closed_summary(pooled_p, [])
-    out = {"plateau": cs_all}
-    thou = lambda v: f"{v:,}".replace(",", "{,}")  # noqa: E731
-
-    def paired(a, b):
-        return 1.0 if all(abs(x - y) < 1e-12 for x, y in zip(a, b)) else float(
-            wilcoxon(a, b, zero_method="zsplit").pvalue)
-
+    """Three controllers on the same 48 live configurations (seed 2 of each
+    workload), each paired run by run with the uncontrolled recording:
+    the KAN controller (unseen-workload gate, guard on), standard practice
+    (reduce-on-plateau + patience-8 early stopping), and the KAN gate as
+    stop rule with the reduce-on-plateau learning-rate schedule."""
+    policies = [("kan", LOWO_FILE.get), ("plat", lambda w: PLATEAU_FILE.format(w=w)),
+                ("ks", lambda w: KANSTOP_FILE.format(w=w))]
+    pooled = {k: [] for k, _ in policies}
     lines = []
-    for label, cs, p_s, k_s in rows + [("All four workloads", cs_all, pooled_p, pooled_k)]:
-        kan_used = sum(s["epochs_run"] for s in k_s)
-        p_loss = paired([s["best_val_controlled"] for s in k_s], [s["best_val_controlled"] for s in p_s])
-        p_ep = paired([s["epochs_run"] for s in k_s], [s["epochs_run"] for s in p_s])
-        kan_rel = statistics.median(s["rel_change_pct"] for s in k_s)
-        line = (f"{label} & {thou(cs['used'])} & {f2(cs['rel_median'])} & {cs['better2']}/{cs['worse2']} & "
-                f"{cs['adj_total']} & {thou(kan_used)} & {f2(kan_rel)} & "
-                f"{sum(s['rel_change_pct'] < -2 for s in k_s)}/{sum(s['rel_change_pct'] > 2 for s in k_s)} & "
-                f"{pv(p_ep)} & {pv(p_loss)} \\\\")
-        if label.startswith("All"):
-            line = "\\midrule\n" + line
-            m("PL@all@used", thou(cs["used"])); m("PL@all@saved", f1(cs["saved"]))
-            m("PL@all@relmed", f2(cs["rel_median"])); m("PL@all@better", cs["better2"])
-            m("PL@all@worse", cs["worse2"]); m("PL@all@p", pm(cs["p"])); m("PL@all@adj", cs["adj_total"])
-            m("PL@all@adjmax", cs["adj_max"]); m("PL@all@stopped", cs["stopped"])
-            m("PL@all@pep", pm(p_ep)); m("PL@all@ploss", pm(p_loss))
-            m("PL@all@acc", f2(cs["acc_mean_pp"]))
-            diff = [k["best_val_controlled"] - q["best_val_controlled"] for k, q in zip(k_s, p_s)]
-            m("PL@all@kanbetter", sum(d < 0 for d in diff)); m("PL@all@plbetter", sum(d > 0 for d in diff))
-        else:
-            m("PL@" + [k for k, v in WL_SHORT.items() if v == label][0].replace("_", "") + "@ploss", pm(p_loss))
-        lines.append(line)
+    thou = lambda v: f"{v:,}".replace(",", "{,}")  # noqa: E731
+    per = []
+    for w in WORKLOADS:
+        cells = []
+        ids = None
+        for k, fname in policies:
+            path = RES / fname(w)
+            if not path.exists():
+                raise SystemExit(f"missing {path}: run experiments/closed_loop_baseline.py first")
+            summ = {s["run_id"]: s for s in json.loads(path.read_text())["summary"]}
+            ids = ids or sorted(summ)
+            assert sorted(summ) == ids, (w, k)
+            rows = [summ[i] for i in ids]
+            pooled[k] += rows
+            cs = closed_summary(rows, [])
+            cells.append(cs)
+        per.append((WL_SHORT[w], cells))
+    per.append(("All four workloads", [closed_summary(pooled[k], []) for k, _ in policies]))
+    for label, cells in per:
+        row = label + " & " + " & ".join(
+            f"{thou(cs['used'])} & ${f2(cs['rel_median'])}$ & {cs['better2']}/{cs['worse2']}" for cs in cells) + " \\\\"
+        lines.append(("\\midrule\n" if label.startswith("All") else "") + row)
     (GEN / "table_plateau.tex").write_text("\n".join(lines) + "\n")
-    return out
+    for (k, _), cs in zip(policies, per[-1][1]):
+        pre = f"PL@{k}@"
+        m(pre + "used", thou(cs["used"])); m(pre + "saved", f1(cs["saved"]))
+        m(pre + "relmed", f2(cs["rel_median"])); m(pre + "relmean", f2(cs["rel_mean"]))
+        m(pre + "better", cs["better2"]); m(pre + "worse", cs["worse2"]); m(pre + "p", pm(cs["p"]))
+        m(pre + "adj", cs["adj_total"]); m(pre + "stopped", cs["stopped"]); m(pre + "acc", f2(cs["acc_mean_pp"]))
+        m(pre + "relmax", f1(cs["rel_max"]))
+    for a, b in [("kan", "plat"), ("ks", "plat"), ("ks", "kan")]:
+        la = [s["best_val_controlled"] for s in pooled[a]]
+        lb = [s["best_val_controlled"] for s in pooled[b]]
+        ea = [s["epochs_run"] for s in pooled[a]]
+        eb = [s["epochs_run"] for s in pooled[b]]
+        m(f"PL@{a}{b}@ploss", pm(_paired_p(la, lb))); m(f"PL@{a}{b}@pep", pm(_paired_p(ea, eb)))
+        m(f"PL@{a}{b}@abetter", sum(x < y for x, y in zip(la, lb)))
+        m(f"PL@{a}{b}@bbetter", sum(x > y for x, y in zip(la, lb)))
+    return pooled
 
 # ----------------------------------------------------------------------------- deployed gate
 
