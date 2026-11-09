@@ -337,6 +337,112 @@ def closed_loop() -> dict:
     return out
 
 
+
+# ----------------------------------------------------------------------------- tuned patience under transfer
+
+PAT_TARGETS = [0.1, 0.2, 0.3, 0.5]   # mean-regret targets (%) used to pick a patience
+
+
+def patience_transfer(g: dict) -> None:
+    """A patience rule tuned the way the gate is trained: for each held-out
+    workload, pick the patience (1 to 20 epochs) that saves the most compute
+    on the other three workloads while keeping their mean regret within a
+    target, then apply it to the held-out workload."""
+    runs = {w: [json.loads(l) for l in curves_path(w).read_text().splitlines() if l.strip()]
+            for w in WORKLOADS}
+    T = len(next(iter(runs.values()))[0]["val_loss"])
+
+    def outcomes(rs, p):
+        return [B.outcome(r, B.stop_patience(r, p)) for r in rs]
+
+    def stats(o):
+        return (100 * float(np.mean([1 - x["stop_epoch"] / T for x in o])),
+                100 * float(np.mean([x["regret"] for x in o])),
+                100 * float(np.mean([x["premature"] for x in o])))
+
+    rows = []
+    for ti, target in enumerate(PAT_TARGETS):
+        chosen, pooled, worst = {}, [], 0.0
+        for held in WORKLOADS:
+            train = [r for w in WORKLOADS if w != held for r in runs[w]]
+            ok = [p for p in range(1, 21) if stats(outcomes(train, p))[1] <= target]
+            chosen[held] = min(ok) if ok else 20
+            o = outcomes(runs[held], chosen[held])
+            pooled += o
+            worst = max(worst, stats(o)[1])
+        saved, regret, prem = stats(pooled)
+        key = "PT@" + str(ti)
+        m(key + "@target", f2(target)); m(key + "@saved", f1(saved)); m(key + "@regret", f2(regret))
+        m(key + "@prem", f1(prem)); m(key + "@worst", f2(worst))
+        m(key + "@sgd", chosen["fmnist_mlp_sgd"]); m(key + "@cnn", chosen["fmnist_cnn"])
+        pats = ", ".join(str(chosen[w]) for w in WORKLOADS)
+        rows.append(f"{f2(target)} & {pats} & {f1(saved)} & {f2(regret)} & {f1(prem)} & {f2(worst)} \\\\")
+    kan = g["per_workload"]["lowo"]
+    worst_kan = max(v[OURS]["mean_regret_pct"] for v in kan.values())
+    m("PT@kanworst", f2(worst_kan))
+    (GEN / "table_patience_transfer.tex").write_text("\n".join(rows) + "\n")
+
+
+# ----------------------------------------------------------------------------- standard practice in closed loop
+
+PLATEAU_FILE = "closed_loop_{w}_plateau_lr3_stop8.json"
+LOWO_FILE = {"fmnist_cnn": "closed_loop_fmnist_cnn_lowo_guard.json",
+             "mnist_cnn": "closed_loop_mnist_cnn_lowo_guard.json",
+             "cifar10_cnn": "closed_loop_cifar10_cnn_lowo_guard.json",
+             "fmnist_mlp_sgd": "closed_loop_fmnist_mlp_sgd_lowo_guard.json"}
+
+
+def plateau_compare() -> dict:
+    """ReduceLROnPlateau + early stopping on the same 48 live configurations,
+    paired run by run with the KAN controller (unseen-workload gates)."""
+    rows, pooled_p, pooled_k = [], [], []
+    for w in WORKLOADS:
+        dp = json.loads((RES / PLATEAU_FILE.format(w=w)).read_text())
+        dk = json.loads((RES / LOWO_FILE[w]).read_text())
+        sp = {s["run_id"]: s for s in dp["summary"]}
+        sk = {s["run_id"]: s for s in dk["summary"]}
+        assert sp.keys() == sk.keys(), w
+        ids = sorted(sp)
+        pooled_p += [sp[i] for i in ids]
+        pooled_k += [sk[i] for i in ids]
+        cs = closed_summary([sp[i] for i in ids], dp["runs"])
+        key = "PL@" + WL_KEY[w] + "@"
+        m(key + "saved", f1(cs["saved"])); m(key + "relmed", f2(cs["rel_median"]))
+        rows.append((WL_SHORT[w], cs, [sp[i] for i in ids], [sk[i] for i in ids]))
+    cs_all = closed_summary(pooled_p, [])
+    out = {"plateau": cs_all}
+    thou = lambda v: f"{v:,}".replace(",", "{,}")  # noqa: E731
+
+    def paired(a, b):
+        return 1.0 if all(abs(x - y) < 1e-12 for x, y in zip(a, b)) else float(
+            wilcoxon(a, b, zero_method="zsplit").pvalue)
+
+    lines = []
+    for label, cs, p_s, k_s in rows + [("All four workloads", cs_all, pooled_p, pooled_k)]:
+        kan_used = sum(s["epochs_run"] for s in k_s)
+        p_loss = paired([s["best_val_controlled"] for s in k_s], [s["best_val_controlled"] for s in p_s])
+        p_ep = paired([s["epochs_run"] for s in k_s], [s["epochs_run"] for s in p_s])
+        kan_rel = statistics.median(s["rel_change_pct"] for s in k_s)
+        line = (f"{label} & {thou(cs['used'])} & {f2(cs['rel_median'])} & {cs['better2']}/{cs['worse2']} & "
+                f"{cs['adj_total']} & {thou(kan_used)} & {f2(kan_rel)} & "
+                f"{sum(s['rel_change_pct'] < -2 for s in k_s)}/{sum(s['rel_change_pct'] > 2 for s in k_s)} & "
+                f"{pv(p_ep)} & {pv(p_loss)} \\\\")
+        if label.startswith("All"):
+            line = "\\midrule\n" + line
+            m("PL@all@used", thou(cs["used"])); m("PL@all@saved", f1(cs["saved"]))
+            m("PL@all@relmed", f2(cs["rel_median"])); m("PL@all@better", cs["better2"])
+            m("PL@all@worse", cs["worse2"]); m("PL@all@p", pm(cs["p"])); m("PL@all@adj", cs["adj_total"])
+            m("PL@all@adjmax", cs["adj_max"]); m("PL@all@stopped", cs["stopped"])
+            m("PL@all@pep", pm(p_ep)); m("PL@all@ploss", pm(p_loss))
+            m("PL@all@acc", f2(cs["acc_mean_pp"]))
+            diff = [k["best_val_controlled"] - q["best_val_controlled"] for k, q in zip(k_s, p_s)]
+            m("PL@all@kanbetter", sum(d < 0 for d in diff)); m("PL@all@plbetter", sum(d > 0 for d in diff))
+        else:
+            m("PL@" + [k for k, v in WL_SHORT.items() if v == label][0].replace("_", "") + "@ploss", pm(p_loss))
+        lines.append(line)
+    (GEN / "table_plateau.tex").write_text("\n".join(lines) + "\n")
+    return out
+
 # ----------------------------------------------------------------------------- deployed gate
 
 def deployed_gate() -> KANGate:
@@ -533,6 +639,8 @@ def main():
     table_tests(g)
     table_ablation(g)
     cl = closed_loop()
+    patience_transfer(g)
+    plateau_compare()
     gate = deployed_gate()
     fig_curves(g)
     fig_frontier(g)
