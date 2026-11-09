@@ -424,6 +424,8 @@ def plateau_compare() -> dict:
             pooled[k] += rows
             cs = closed_summary(rows, [])
             cells.append(cs)
+            m(f"PL@{k}@{WL_KEY[w]}@relmax", f1(cs["rel_max"]))
+            m(f"PL@{k}@{WL_KEY[w]}@saved", f1(cs["saved"]))
         per.append((WL_SHORT[w], cells))
     per.append(("All four workloads", [closed_summary(pooled[k], []) for k, _ in policies]))
     for label, cells in per:
