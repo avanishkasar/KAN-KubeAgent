@@ -132,6 +132,11 @@ def run_lowo(W, label, collect_extra: bool):
                 for pts, X in cache2:
                     with torch.no_grad():
                         spline_scores.append(np.clip(gate.model(torch.tensor(X)).numpy()[:, 0], 0, 100))
+            # benchmark.fit_kan evaluates the network on its validation split just before
+            # fixing the edges, and pykan fits the symbolic functions to the activations of
+            # the most recent forward pass, so repeat that pass to reproduce the same gate
+            with torch.no_grad():
+                gate.model(X_va)
             gate.formula()
             for k, (r, (pts, X)) in enumerate(zip(test, cache2)):
                 with torch.no_grad():
@@ -186,6 +191,7 @@ def main():
         sens[f"w{window}_n{norm}"] = summarise(r_v["kan"], T)
     H.TrainingHistory, F._epochs_since_improvement = orig_th, orig_esi
     sens["w5_n30"] = out["policies"]["kan"]
+    out["reproduces_main_study"] = out["policies"]["kan"]
     out["sensitivity"] = sens
     out["seconds"] = time.time() - t0
     OUT.write_text(json.dumps(out, indent=1))

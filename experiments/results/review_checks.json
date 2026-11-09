@@ -1,0 +1,84 @@
+{
+ "policies": {
+  "kan": {
+   "saved": 36.9212962962963,
+   "regret": 1.8994185891017912,
+   "premature": 14.583333333333334,
+   "n_runs": 144
+  },
+  "kan_every_epoch": {
+   "saved": 39.270833333333336,
+   "regret": 2.471032889409948,
+   "premature": 19.212962962962962,
+   "n_runs": 144
+  },
+  "kan_spline": {
+   "saved": 40.046296296296305,
+   "regret": 1.2800647266388336,
+   "premature": 15.50925925925926,
+   "n_runs": 144
+  },
+  "patience8": {
+   "saved": 29.30555555555555,
+   "regret": 0.21707474481567646,
+   "premature": 2.083333333333333,
+   "n_runs": 144
+  },
+  "patience8_every2": {
+   "saved": 28.40277777777778,
+   "regret": 0.1946242853894061,
+   "premature": 1.3888888888888888,
+   "n_runs": 144
+  },
+  "extrapolation": {
+   "saved": 47.46527777777778,
+   "regret": 11.380795120624871,
+   "premature": 38.19444444444444,
+   "n_runs": 144
+  }
+ },
+ "band_agreement_spline_vs_symbolic": 0.6563786008230452,
+ "tests_vs_kan": {
+  "kan_every_epoch@regret": 1.0615285970183108e-07,
+  "kan_every_epoch@stop_epoch": 3.068863960088251e-22,
+  "kan_spline@regret": 0.6159812132455131,
+  "kan_spline@stop_epoch": 0.0007689474787353901,
+  "patience8_every2@regret": 1.951139520005534e-11,
+  "patience8_every2@stop_epoch": 9.647941416024191e-18,
+  "extrapolation@regret": 0.002816376628873236,
+  "extrapolation@stop_epoch": 2.3778370929783868e-07
+ },
+ "sensitivity": {
+  "w3_n30": {
+   "saved": 22.476851851851855,
+   "regret": 0.10392218136880806,
+   "premature": 1.6203703703703702,
+   "n_runs": 144
+  },
+  "w8_n30": {
+   "saved": 29.432870370370367,
+   "regret": 0.26252617969429215,
+   "premature": 3.009259259259259,
+   "n_runs": 144
+  },
+  "w5_n20": {
+   "saved": 29.5949074074074,
+   "regret": 0.2919410553204217,
+   "premature": 3.7037037037037033,
+   "n_runs": 144
+  },
+  "w5_n40": {
+   "saved": 25.833333333333336,
+   "regret": 0.28426918310259464,
+   "premature": 2.7777777777777777,
+   "n_runs": 144
+  },
+  "w5_n30": {
+   "saved": 36.9212962962963,
+   "regret": 1.8994185891017912,
+   "premature": 14.583333333333334,
+   "n_runs": 144
+  }
+ },
+ "seconds": 426.8023633956909
+}
