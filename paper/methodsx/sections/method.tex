@@ -87,15 +87,17 @@ for w in fmnist_cnn mnist_cnn cifar10_cnn fmnist_mlp_sgd; do
          --epochs 40 --parallel 2
 done
 \end{verbatim}}
-\item Evaluate all policies with both protocols, including the sweeps and ablations (Steps 2 to 4 are run inside every fold):
+\item Evaluate all policies with both protocols, including the sweeps and ablations (Steps 2 to 4 are run inside every fold), and then run the further checks:
 {\footnotesize
 \begin{verbatim}
 python -m experiments.generalization
+python -m experiments.review_checks
 \end{verbatim}}
-\item Run closed-loop control of live training for each workload; add \texttt{-{}-no-guard} to disable the learning-rate guard:
+\item Run closed-loop control of live training for each workload; add \texttt{-{}-no-guard} to disable the learning-rate guard. The second command runs the standard-practice baseline, and adding \texttt{-{}-policy kanstop} to it runs the KAN stop rule with the plateau schedule:
 {\footnotesize
 \begin{verbatim}
 python -m experiments.closed_loop --workload cifar10_cnn --gate lowo
+python -m experiments.closed_loop_baseline --workload cifar10_cnn
 \end{verbatim}}
 \item Train the deployable gate on all recorded curves. The learned formula is printed and the checkpoint is saved:
 {\footnotesize
